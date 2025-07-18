@@ -2,7 +2,6 @@
 @section('title', 'Pelanggan')
 
 @push('style')
-    <!-- CSS Libraries -->
     <link rel="stylesheet"
         href="{{ asset('library/selectric/public/selectric.css') }}">
 @endpush
@@ -13,7 +12,7 @@
                 <h1>{{ $title ?? '' }}</h1>
                 <div class="section-header-breadcrumb">
                     <div class="breadcrumb-item"><a href="/home">Dashboard</a></div>
-                    <div class="breadcrumb-item">Search Pelanggan</div>
+                    <div class="breadcrumb-item">Cari Pelanggan</div>
                 </div>
             </div>
 
@@ -23,34 +22,20 @@
                         <form action="" method="POST">
                             @csrf
                             <div class="row">
-
-
-                                <div class="col-md-4 mb-3">
-                                    <label for="kendaraan" class="form-label">ID Pelanggan</label>
-                                    <input type="text" class="form-control @error('id_pel') is-invalid @enderror"
-                                        id="id_pel" name="id_pel" value="{{ old('id_pel') }}" required>
-                                    @error('id_pel')
+                                <div class="col-md-6 mb-3"> {{-- Gunakan col-md-6 agar input lebih lebar --}}
+                                    <label for="search_query" class="form-label">ID Pelanggan atau No Meter</label>
+                                    <input type="text" class="form-control @error('search_query') is-invalid @enderror"
+                                        id="search_query" name="search_query" value="{{ old('search_query') }}" required>
+                                    @error('search_query')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
                                 </div>
 
-                                 <div class="col-md-4 mb-3">
-                                    <label for="kendaraan" class="form-label">No Meter</label>
-                                    <input type="text" class="form-control @error('no_meter') is-invalid @enderror"
-                                        id="no_meter" name="no_meter" value="{{ old('no_meter') }}" required>
-                                    @error('no_meter')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
+                                <div class="col-md-6 mt-4"> {{-- Sesuaikan margin top --}}
+                                    <button type="button" class="btn btn-primary" id="searchBtn">Cari</button>
                                 </div>
-
-                             <div class="col-md-4 mt-4">
-                                <button type="button" class="btn btn-primary" id="searchBtn">Filter</button>
                             </div>
-
-                            </div>
-
                         </form>
-
                     </div>
 
                     <div class="text-center my-3" id="loading" style="display: none;">
@@ -62,9 +47,7 @@
                     </div>
                 </div>
             </div>
-
         </section>
-
     </div>
 @endsection
 
@@ -81,19 +64,17 @@
 </style>
 <script>
     $('#searchBtn').click(function () {
-        let id_pel = $('#id_pel').val();
-        let no_meter = $('#no_meter').val();
+        let searchQuery = $('#search_query').val(); // Ambil nilai dari satu input
 
         $('#loading').show();
-        $('#result').html('');
+        $('#result').html(''); // Kosongkan hasil sebelumnya
 
         $.ajax({
             url: '{{ route("search.pelanggan") }}',
             method: 'POST',
             data: {
                 _token: '{{ csrf_token() }}',
-                id_pel: id_pel,
-                no_meter: no_meter
+                search_query: searchQuery // Kirim satu parameter
             },
             success: function (response) {
                 $('#loading').hide();
@@ -103,13 +84,17 @@
                     $('#result').html('<div class="alert alert-danger">' + response.message + '</div>');
                 }
             },
-            error: function () {
+            error: function (xhr, status, error) {
                 $('#loading').hide();
-                $('#result').html('<div class="alert alert-danger">Terjadi kesalahan saat mengambil data.</div>');
+                // Lebih detail untuk error AJAX
+                let errorMessage = 'Terjadi kesalahan saat mengambil data.';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMessage = xhr.responseJSON.message;
+                }
+                $('#result').html('<div class="alert alert-danger">' + errorMessage + '</div>');
+                console.error("AJAX Error:", status, error, xhr.responseText);
             }
         });
     });
 </script>
-
 @endpush
-

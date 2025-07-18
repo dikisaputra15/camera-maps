@@ -1,10 +1,9 @@
 
-<div class="table-responsive">
 <table class="table-striped table">
     <thead>
         <tr>
-            <th>ID Pelanggan</th>
-            <th>Action</th>
+            <th style="width: 60%;">ID Pelanggan</th>
+            <th style="width: 40%;">Action</th>
         </tr>
     </thead>
     <tbody>
@@ -22,4 +21,3 @@
         @endforeach
     </tbody>
 </table>
-</div>

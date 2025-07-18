@@ -118,51 +118,32 @@ class PelangganController extends Controller
 
     public function searchPelanggan(Request $request)
     {
-        $id_pel   = trim($request->id_pel);
-        $no_meter = trim($request->no_meter);
+        // Validasi input
+        $request->validate([
+            'search_query' => 'required|string|max:255',
+        ]);
 
-        if ($id_pel === '' && $no_meter === '') {
+        $query = $request->input('search_query');
+
+        // Lakukan pencarian berdasarkan id_pel ATAU no_meter
+        $data = Pelanggan::where('id_pel', $query)
+                              ->orWhere('no_meter', $query)
+                              ->get();
+
+        if ($data->isEmpty()) {
             return response()->json([
                 'success' => false,
-                'html'    => '<p class="text-danger">Masukkan ID Pel atau No. Meter lebih dulu.</p>'
+                'message' => 'Data pelanggan tidak ditemukan.'
             ]);
         }
 
-        $data = DB::table('pelanggans')
-            ->when($id_pel && $no_meter, function ($query) use ($id_pel, $no_meter) {
-                // Jika keduanya diisi, gunakan OR
-                $query->where(function ($q) use ($id_pel, $no_meter) {
-                    $q->where('id_pel', $id_pel)
-                    ->orWhere('no_meter', $no_meter);
-                });
-            })
-            ->when($id_pel && !$no_meter, function ($query) use ($id_pel) {
-                $query->where('id_pel', $id_pel);
-            })
-            ->when($no_meter && !$id_pel, function ($query) use ($no_meter) {
-                $query->where('no_meter', $no_meter);
-            })
-            /*
-            ->where(function ($query) {
-                $query->whereNull('gambar_kwh')
-                    ->orWhere('gambar_kwh', '')
-                    ->orWhereNull('gambar_rumah')
-                    ->orWhere('gambar_rumah', '');
-            })
-            */
-            ->get();
-
-        if ($data->isNotEmpty()) {
-            return response()->json([
-                'success' => true,
-                'html'    => view('pelanggan.result-pelanggan', compact('data'))->render()
-            ]);
-        }
+         $html = view('pelanggan.result-pelanggan', compact('data'))->render();
 
         return response()->json([
-            'success' => false,
-            'html'    => '<p class="text-danger">Data pelanggan tidak ditemukan.</p>'
+            'success' => true,
+            'html'    => $html
         ]);
+
     }
 
      public function formupload($id)
