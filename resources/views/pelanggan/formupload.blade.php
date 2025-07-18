@@ -20,7 +20,7 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        overflow: hidden; /* Ensure content doesn't spill out */
+        overflow: hidden;
     }
 
     video, canvas {
@@ -54,6 +54,8 @@
 
     .btn-start { background: #28a745; }
     .btn-capture { background: #007bff; }
+    .btn-submit { background: #6c757d; } /* New submit button style */
+
 
     .message {
         margin-top: 10px;
@@ -91,10 +93,13 @@
     <section class="section">
         <div class="section-header">
             <h1>Upload Gambar KWH dan Rumah</h1>
+            {{-- Hidden input to store the customer ID passed from the route --}}
+            {{-- Assumes route is something like /search-pelanggan/{id}/formupload --}}
+            <input type="hidden" id="pelangganId" value="{{ request()->route('id') }}">
         </div>
         <div class="section-body">
 
-            {{-- CAMERA SECTION --}}
+            {{-- CAMERA SECTION KWH --}}
             <div class="camera-section">
                 <h3>Foto KWH</h3>
                 <div class="camera-feed-container">
@@ -108,9 +113,11 @@
                 <div class="message" id="msgKWH">Status: Standby</div>
                 <div class="image-results">
                     <img id="imageKWH" style="display: none;">
+                    <div id="mapKWH" class="map-container" style="display: none;"></div>
                 </div>
             </div>
 
+            {{-- CAMERA SECTION RUMAH --}}
             <div class="camera-section">
                 <h3>Foto Rumah</h3>
                 <div class="camera-feed-container">
@@ -124,7 +131,13 @@
                 <div class="message" id="msgRumah">Status: Standby</div>
                 <div class="image-results">
                     <img id="imageRumah" style="display: none;">
+                    <div id="mapRumah" class="map-container" style="display: none;"></div>
                 </div>
+            </div>
+
+            <div class="text-center mt-4">
+                <button id="submitAllImages" class="btn btn-submit" disabled>Simpan Semua Gambar</button>
+                <div id="submitMessage" class="message text-info"></div>
             </div>
 
         </div>
@@ -133,17 +146,21 @@
 @endsection
 
 @push('scripts')
+{{-- PASTIKAN ANDA MENGGANTI SELURUH ISI DARI SINI --}}
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
     // --- Configuration ---
-    // Menggunakan Nominatim (OpenStreetMap's own geocoder) untuk reverse geocoding.
-    // PENTING: Penggunaan instance publik Nominatim (https://nominatim.openstreetmap.org/)
-    // memiliki kebijakan penggunaan yang ketat dan batasan frekuensi permintaan.
-    // Untuk penggunaan komersial atau volume tinggi, disarankan untuk
-    // menginstal instance Nominatim Anda sendiri.
     const NOMINATIM_REVERSE_GEOCODING_API_URL = 'https://nominatim.openstreetmap.org/reverse';
+    const LARAVEL_WEB_UPLOAD_URL = '/pelanggans/';
 
-    // --- Helper Functions ---
+    let capturedImageKWH = null;
+    let capturedImageRumah = null;
+
+    const pelangganId = document.getElementById('pelangganId').value;
+    const submitAllImagesBtn = document.getElementById('submitAllImages');
+    const submitMessageEl = document.getElementById('submitMessage');
+
+    // --- Helper Functions (DEFINISIKAN DULU SEMUA FUNGSI DI SINI) ---
 
     /**
      * Starts the camera feed.
@@ -155,12 +172,11 @@
      */
     async function startCamera(video, overlay, msgEl, btnCapture) {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }); // Prefer rear camera
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
             video.srcObject = stream;
             btnCapture.disabled = false;
             msgEl.innerText = "Kamera aktif";
             video.onloadedmetadata = () => {
-                // Set overlay dimensions to match video
                 overlay.width = video.videoWidth;
                 overlay.height = video.videoHeight;
             };
@@ -186,7 +202,7 @@
                 },
                 (err) => {
                     console.warn(`ERROR(${err.code}): ${err.message}`);
-                    resolve({ lat: 'N/A', lon: 'N/A' }); // Fallback for location failure
+                    resolve({ lat: 'N/A', lon: 'N/A' });
                 },
                 {
                     enableHighAccuracy: true,
@@ -208,13 +224,10 @@
             return 'Lokasi tidak tersedia';
         }
         try {
-            // Parameter Nominatim: format=json, lat=latitude, lon=longitude, zoom=18 (detail level), addressdetails=1 (untuk detail alamat)
             const response = await fetch(`${NOMINATIM_REVERSE_GEOCODING_API_URL}?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`);
             const data = await response.json();
 
             if (data && data.display_name) {
-                // Nominatim memberikan `display_name` yang sudah diformat.
-                // Anda juga bisa mencoba mengkonstruksi dari `address` object jika diperlukan.
                 const address = data.address;
                 const addressParts = [];
 
@@ -238,14 +251,44 @@
     }
 
     /**
-     * Captures an image from the video stream, adds location and timestamp overlay, and displays it.
+     * Helper function to wrap text.
+     * @param {CanvasRenderingContext2D} context - The 2D rendering context of the canvas.
+     * @param {string} text - The text to wrap.
+     * @param {number} maxWidth - The maximum width for a line of text.
+     * @returns {string[]} - An array of strings, where each string is a line.
+     */
+    function wrapText(context, text, maxWidth) {
+        const words = text.split(' ');
+        let line = '';
+        const lines = [];
+
+        for (let n = 0; n < words.length; n++) {
+            const testLine = line + words[n] + ' ';
+            const metrics = context.measureText(testLine);
+            const testWidth = metrics.width;
+
+            if (testWidth > maxWidth && n > 0) {
+                lines.push(line.trim());
+                line = words[n] + ' ';
+            } else {
+                line = testLine;
+            }
+        }
+        lines.push(line.trim());
+        return lines;
+    }
+
+    /**
+     * Captures an image from the video stream, adds location and timestamp overlay, displays it,
+     * and stores the Data URL in a global variable.
      * @param {HTMLVideoElement} video - The video element to capture from.
      * @param {HTMLCanvasElement} overlay - The canvas element for live overlay.
      * @param {HTMLImageElement} imgTarget - The image element to display the captured photo.
      * @param {HTMLElement} msgEl - The element to display status messages.
      * @param {HTMLElement} mapContainer - The div element for the map.
+     * @param {string} imageType - 'kwh' or 'rumah' (THIS PARAMETER IS CRUCIAL)
      */
-    async function captureImage(video, overlay, imgTarget, msgEl, mapContainer) {
+    async function captureImage(video, overlay, imgTarget, msgEl, mapContainer, imageType) {
         msgEl.innerText = "Mengambil foto dan lokasi...";
 
         const canvas = document.createElement('canvas');
@@ -255,65 +298,80 @@
         const ctx = canvas.getContext('2d');
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        // Clear live overlay
         const overlayCtx = overlay.getContext('2d');
         overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
 
-        // Get location information
         const { lat, lon } = await getLocationCoordinates();
         const fullAddress = await getAddressFromCoordinates(lat, lon);
         const timestamp = new Date().toLocaleString();
 
         const locationTextLatLon = `Lat: ${lat}, Lon: ${lon}`;
-        const locationTextAddress = `${fullAddress}`;
         const dateTimeText = `${timestamp}`;
 
-        // Prepare text properties for drawing on the captured image
-        ctx.font = "24px Arial"; // Larger font for better readability
+        const FONT_SIZE = 24;
+        ctx.font = `${FONT_SIZE}px Arial`;
         ctx.fillStyle = "white";
         ctx.strokeStyle = "black";
-        ctx.lineWidth = 2; // Outline for better contrast
+        ctx.lineWidth = 2;
 
-        // Draw background rectangle for text
-        const textPadding = 10;
-        const lineHeight = 30; // Estimate line height
-        const rectHeight = (3 * lineHeight) + (4 * textPadding); // For 3 lines of text
-        const rectY = canvas.height - rectHeight - 10; // 10px from bottom
+        const textPaddingX = 20;
+        const textPaddingY = 10;
+        const lineHeight = FONT_SIZE * 1.2;
 
-        ctx.fillStyle = "rgba(0,0,0,0.6)"; // Semi-transparent black background
-        ctx.fillRect(10, rectY, canvas.width - 20, rectHeight); // Full width, 10px padding from sides
+        const availableWidthForText = canvas.width - (2 * textPaddingX);
 
-        // Draw text lines
+        const wrappedAddressLines = wrapText(ctx, fullAddress, availableWidthForText);
+
+        const totalTextLines = 1 + wrappedAddressLines.length + 1;
+        const rectHeight = (totalTextLines * lineHeight) + (2 * textPaddingY);
+        const rectY = canvas.height - rectHeight - 10;
+
+        ctx.fillStyle = "rgba(0,0,0,0.6)";
+        ctx.fillRect(10, rectY, canvas.width - 20, rectHeight);
+
         ctx.textBaseline = 'top';
-        ctx.fillStyle = "white"; // Reset fill style for text
+        ctx.fillStyle = "white";
 
-        let currentY = rectY + textPadding;
-        ctx.strokeText(locationTextLatLon, 20, currentY);
-        ctx.fillText(locationTextLatLon, 20, currentY);
+        let currentY = rectY + textPaddingY;
 
-        currentY += lineHeight + textPadding / 2; // Move to next line
-        ctx.strokeText(locationTextAddress, 20, currentY);
-        ctx.fillText(locationTextAddress, 20, currentY);
+        ctx.strokeText(locationTextLatLon, textPaddingX, currentY);
+        ctx.fillText(locationTextLatLon, textPaddingX, currentY);
+        currentY += lineHeight;
 
-        currentY += lineHeight + textPadding / 2; // Move to next line
-        ctx.strokeText(dateTimeText, 20, currentY);
-        ctx.fillText(dateTimeText, 20, currentY);
+        for (let i = 0; i < wrappedAddressLines.length; i++) {
+            ctx.strokeText(wrappedAddressLines[i], textPaddingX, currentY);
+            ctx.fillText(wrappedAddressLines[i], textPaddingX, currentY);
+            currentY += lineHeight;
+        }
 
-        // Set the image source
-        imgTarget.src = canvas.toDataURL('image/png');
+        ctx.strokeText(dateTimeText, textPaddingX, currentY);
+        ctx.fillText(dateTimeText, textPaddingX, currentY);
+
+        const imageDataURL = canvas.toDataURL('image/png');
+        imgTarget.src = imageDataURL;
         imgTarget.style.display = 'block';
+
+        // --- PENTING: Penyimpanan gambar ke variabel global ---
+        if (imageType === 'kwh') {
+            capturedImageKWH = imageDataURL;
+        } else if (imageType === 'rumah') {
+            capturedImageRumah = imageDataURL;
+        }
+        // --- Akhir Bagian Penting ---
 
         msgEl.innerText = "Foto berhasil diambil dengan informasi lokasi.";
 
-        // --- Leaflet Map Integration ---
-        if (lat !== 'N/A' && lon !== 'N/A') {
+        if (lat !== 'N/A' && lon !== 'N/A' && mapContainer) {
             mapContainer.style.display = 'block';
             initializeLeafletMap(mapContainer.id, parseFloat(lat), parseFloat(lon), fullAddress);
-        } else {
-            mapContainer.style.display = 'none'; // Hide map if no location
-            console.warn("No valid coordinates to display map.");
+        } else if (mapContainer) {
+            mapContainer.style.display = 'none';
+            console.warn("No valid coordinates to display map or map container not found.");
         }
+        // Panggil ini setelah gambar disimpan
+        checkSubmitButtonStatus(); // Ini akan mengaktifkan tombol simpan
     }
+
 
     /**
      * Initializes a Leaflet map in the specified container.
@@ -322,16 +380,15 @@
      * @param {number} lon - Longitude.
      * @param {string} popupText - Text to display in the marker popup.
      */
-    let maps = {}; // Store map instances to avoid re-initializing
+    let maps = {};
 
     function initializeLeafletMap(mapId, lat, lon, popupText) {
-        // Destroy existing map instance if it exists
         if (maps[mapId]) {
             maps[mapId].remove();
-            maps[mapId] = null; // Clear the reference
+            maps[mapId] = null;
         }
 
-        const map = L.map(mapId).setView([lat, lon], 17); // Set zoom level to 17 for close-up
+        const map = L.map(mapId).setView([lat, lon], 17);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
@@ -342,19 +399,23 @@
             .addTo(map)
             .bindPopup(`<b>Lokasi Foto:</b><br>${popupText || 'Koordinat: ' + lat + ', ' + lon}`).openPopup();
 
-        maps[mapId] = map; // Store the new map instance
+        maps[mapId] = map;
     }
 
-    // --- Live Overlay Drawing (Optional but good for user feedback) ---
+    /**
+     * Draws live location/time overlay on video feed.
+     * @param {HTMLVideoElement} video - The video element.
+     * @param {HTMLCanvasElement} overlay - The overlay canvas.
+     */
     function drawLiveOverlay(video, overlay) {
         const overlayCtx = overlay.getContext('2d');
         const draw = async () => {
-            if (!video.srcObject) return; // Stop drawing if camera is off
+            if (!video.srcObject) return;
 
             overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
 
             const { lat, lon } = await getLocationCoordinates();
-            const timestamp = new Date().toLocaleTimeString(); // Only time for live
+            const timestamp = new Date().toLocaleTimeString();
 
             const text1 = `Lat: ${lat}, Lon: ${lon}`;
             const text2 = `Time: ${timestamp}`;
@@ -385,32 +446,98 @@
         requestAnimationFrame(draw);
     }
 
+    /**
+     * Function to check if both images are captured and enable submit button.
+     */
+    function checkSubmitButtonStatus() {
+        if (capturedImageKWH && capturedImageRumah && pelangganId) {
+            submitAllImagesBtn.disabled = false;
+        } else {
+            submitAllImagesBtn.disabled = true;
+        }
+    }
 
-    // --- KWH Camera Setup ---
+
+    /**
+     * Submits both captured images to the Laravel backend via a web route.
+     */
+    async function uploadImages() {
+        if (!pelangganId) {
+            submitMessageEl.innerText = "ID Pelanggan tidak ditemukan. Tidak dapat menyimpan.";
+            return;
+        }
+
+        if (!capturedImageKWH || !capturedImageRumah) {
+            submitMessageEl.innerText = "Harap ambil kedua foto (KWH dan Rumah) terlebih dahulu.";
+            return;
+        }
+
+        submitAllImagesBtn.disabled = true;
+        submitMessageEl.innerText = "Menyimpan gambar, harap tunggu...";
+
+        const data = {
+            gambar_kwh: capturedImageKWH,
+            gambar_rumah: capturedImageRumah,
+            _method: 'PUT' // Penting untuk Laravel jika route Anda menggunakan PUT/PATCH
+        };
+
+        try {
+            const response = await fetch(`${LARAVEL_WEB_UPLOAD_URL}${pelangganId}/update-gambar`, {
+                method: 'POST', // Gunakan POST karena _method akan mengubahnya menjadi PUT di Laravel
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}' // Laravel CSRF Token
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                submitMessageEl.innerText = `Gambar berhasil disimpan! ${result.message || ''}`;
+                submitMessageEl.style.color = 'green';
+                // Opsional: Redirect atau refresh halaman setelah sukses
+                // window.location.href = `/pelanggans/${pelangganId}`;
+            } else {
+                submitMessageEl.innerText = `Gagal menyimpan gambar: ${result.message || 'Terjadi kesalahan'}`;
+                submitMessageEl.style.color = 'red';
+                console.error("Upload failed:", result);
+            }
+        } catch (error) {
+            submitMessageEl.innerText = `Terjadi kesalahan jaringan: ${error.message}`;
+            submitMessageEl.style.color = 'red';
+            console.error("Network error during upload:", error);
+        } finally {
+            submitAllImagesBtn.disabled = false;
+        }
+    }
+
+
+    // --- KWH Camera Setup (INILAH BAGIAN YANG MEMANGGIL FUNGSI) ---
     const videoKWH = document.getElementById('videoKWH');
     const overlayKWH = document.getElementById('overlayKWH');
     const msgKWH = document.getElementById('msgKWH');
     const btnStartKWH = document.getElementById('startKWH');
     const btnCaptureKWH = document.getElementById('captureKWH');
     const imgKWH = document.getElementById('imageKWH');
-    const mapKWH = document.getElementById('mapKWH'); // Get map container
+    const mapKWH = document.getElementById('mapKWH');
 
     let streamKWH = null;
 
     btnStartKWH.addEventListener('click', async () => {
         streamKWH = await startCamera(videoKWH, overlayKWH, msgKWH, btnCaptureKWH);
         if (streamKWH) {
-            drawLiveOverlay(videoKWH, overlayKWH); // Start live overlay
+            drawLiveOverlay(videoKWH, overlayKWH);
         }
     });
 
     btnCaptureKWH.addEventListener('click', () => {
-        captureImage(videoKWH, overlayKWH, imgKWH, msgKWH, mapKWH); // Pass map container
+        captureImage(videoKWH, overlayKWH, imgKWH, msgKWH, mapKWH, 'kwh'); // <-- PASTIKAN 'kwh' DIKIRIM
         if (streamKWH) {
             streamKWH.getTracks().forEach(track => track.stop());
             videoKWH.srcObject = null;
-            btnCaptureKWH.disabled = true; // Disable capture after stopping
-            msgKWH.innerText = "Status: Kamera dimatikan";
+            btnCaptureKWH.disabled = true;
+            msgKWH.innerText = "Status: Kamera KWH dimatikan";
         }
     });
 
@@ -421,25 +548,32 @@
     const btnStartRumah = document.getElementById('startRumah');
     const btnCaptureRumah = document.getElementById('captureRumah');
     const imgRumah = document.getElementById('imageRumah');
-    const mapRumah = document.getElementById('mapRumah'); // Get map container
+    const mapRumah = document.getElementById('mapRumah');
 
     let streamRumah = null;
 
     btnStartRumah.addEventListener('click', async () => {
         streamRumah = await startCamera(videoRumah, overlayRumah, msgRumah, btnCaptureRumah);
         if (streamRumah) {
-            drawLiveOverlay(videoRumah, overlayRumah); // Start live overlay
+            drawLiveOverlay(videoRumah, overlayRumah);
         }
     });
 
     btnCaptureRumah.addEventListener('click', () => {
-        captureImage(videoRumah, overlayRumah, imgRumah, msgRumah, mapRumah); // Pass map container
+        captureImage(videoRumah, overlayRumah, imgRumah, msgRumah, mapRumah, 'rumah'); // <-- PASTIKAN 'rumah' DIKIRIM
         if (streamRumah) {
             streamRumah.getTracks().forEach(track => track.stop());
             videoRumah.srcObject = null;
-            btnCaptureRumah.disabled = true; // Disable capture after stopping
-            msgRumah.innerText = "Status: Kamera dimatikan";
+            btnCaptureRumah.disabled = true;
+            msgRumah.innerText = "Status: Kamera Rumah dimatikan";
         }
     });
+
+    // Event listener untuk tombol "Simpan Semua Gambar"
+    submitAllImagesBtn.addEventListener('click', uploadImages);
+
+    // Panggil ini saat halaman dimuat untuk mengatur status awal tombol
+    checkSubmitButtonStatus();
 </script>
+{{-- SAMPAI SINI --}}
 @endpush

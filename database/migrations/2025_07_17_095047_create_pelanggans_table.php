@@ -15,8 +15,8 @@ return new class extends Migration
             $table->id();
             $table->string('id_pel');
             $table->string('no_meter');
-            $table->string('gambar_rumah')->nullable();
-            $table->string('gambar_kwh')->nullable();
+            $table->text('gambar_rumah')->nullable();
+            $table->text('gambar_kwh')->nullable();
             $table->timestamps();
         });
     }

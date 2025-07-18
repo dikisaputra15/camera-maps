@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use App\Models\Pelanggan;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class PelangganController extends Controller
 {
@@ -122,12 +124,12 @@ class PelangganController extends Controller
         $data = DB::table('pelanggans')
             ->where('id_pel', $id_pel)
             ->where('no_meter', $no_meter)
-            ->where(function ($query) {
-                $query->whereNull('gambar_kwh')
-                    ->orWhere('gambar_kwh', '')
-                    ->orWhereNull('gambar_rumah')
-                    ->orWhere('gambar_rumah', '');
-            })
+            // ->where(function ($query) {
+            //     $query->whereNull('gambar_kwh')
+            //         ->orWhere('gambar_kwh', '')
+            //         ->orWhereNull('gambar_rumah')
+            //         ->orWhere('gambar_rumah', '');
+            // })
             ->get();
 
         if ($data->isNotEmpty()) {
@@ -148,5 +150,60 @@ class PelangganController extends Controller
         $pelanggan = Pelanggan::find($id);
 
         return view('pelanggan.formupload', compact('pelanggan'));
+    }
+
+    public function updateImages(Request $request, $id)
+    {
+         $pelanggan = Pelanggan::find($id);
+
+        if (!$pelanggan) {
+            return response()->json(['message' => 'Pelanggan tidak ditemukan'], 404);
+        }
+
+        $request->validate([
+            'gambar_kwh'   => 'required|string',
+            'gambar_rumah' => 'required|string',
+        ]);
+
+        try {
+            // Fungsi menyimpan base64 ke storage menggunakan storeAs
+            $storeBase64Image = function (string $base64Image, string $folder, string $prefix) {
+                // Bersihkan header base64
+                $base64 = preg_replace('/^data:image\/[a-zA-Z]+;base64,/', '', $base64Image);
+                $base64 = str_replace(' ', '+', $base64);
+
+                // Nama file unik
+                $filename = $prefix . '_' . Str::uuid() . '.png';
+
+                // Simpan ke file sementara
+                $tempPath = sys_get_temp_dir() . '/' . $filename;
+                file_put_contents($tempPath, base64_decode($base64));
+
+                // Gunakan storeAs seperti contoh Anda
+                $storedPath = Storage::disk('public')
+                    ->putFileAs("pelanggan/{$folder}", new \Illuminate\Http\File($tempPath), $filename);
+
+                // Hapus file temp
+                unlink($tempPath);
+
+                return $storedPath; // Hanya path relatif dari 'public'
+            };
+
+            // Simpan gambar KWH → pelanggan/kwh/
+            $gambarKWHPath = $storeBase64Image($request->gambar_kwh, 'kwh', 'kwh');
+            $pelanggan->gambar_kwh = $gambarKWHPath;
+
+            // Simpan gambar Rumah → pelanggan/rumah/
+            $gambarRumahPath = $storeBase64Image($request->gambar_rumah, 'rumah', 'rumah');
+            $pelanggan->gambar_rumah = $gambarRumahPath;
+
+            $pelanggan->save();
+
+            return response()->json(['message' => 'Gambar berhasil diupdate'], 200);
+
+        } catch (\Throwable $e) {
+            \Log::error("Gagal update gambar pelanggan {$id}: {$e->getMessage()}");
+            return response()->json(['message' => 'Gagal mengupdate gambar.'], 500);
+        }
     }
 }

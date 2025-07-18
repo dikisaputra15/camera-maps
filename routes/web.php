@@ -19,4 +19,5 @@ Route::resource('pelanggan', PelangganController::class)->middleware(['auth']);
 Route::get('searchdatapelanggan', [PelangganController::class, 'formsearch'])->middleware(['auth']);
 Route::post('/search-pelanggan', [PelangganController::class, 'searchPelanggan'])->name('search.pelanggan')->middleware(['auth']);
 Route::get('search-pelanggan/{id}/formupload', [PelangganController::class, 'formupload'])->middleware(['auth']);
+Route::put('/pelanggans/{id}/update-gambar', [PelangganController::class, 'updateImages'])->name('pelanggans.update_images')->middleware(['auth']);
 
