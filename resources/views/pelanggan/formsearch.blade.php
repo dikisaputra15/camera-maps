@@ -58,8 +58,8 @@
                             <span class="visually-hidden">Loading...</span>
                         </div>
                     </div>
-
-                    <div id="result" class="mt-4"></div>
+                    <div class="card-body" id="result">
+                    </div>
                 </div>
             </div>
 

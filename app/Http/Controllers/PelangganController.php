@@ -118,30 +118,50 @@ class PelangganController extends Controller
 
     public function searchPelanggan(Request $request)
     {
-        $id_pel = $request->id_pel;
-        $no_meter = $request->no_meter;
+        $id_pel   = trim($request->id_pel);
+        $no_meter = trim($request->no_meter);
+
+        if ($id_pel === '' && $no_meter === '') {
+            return response()->json([
+                'success' => false,
+                'html'    => '<p class="text-danger">Masukkan ID Pel atau No. Meter lebih dulu.</p>'
+            ]);
+        }
 
         $data = DB::table('pelanggans')
-            ->where('id_pel', $id_pel)
-            ->where('no_meter', $no_meter)
-            // ->where(function ($query) {
-            //     $query->whereNull('gambar_kwh')
-            //         ->orWhere('gambar_kwh', '')
-            //         ->orWhereNull('gambar_rumah')
-            //         ->orWhere('gambar_rumah', '');
-            // })
+            ->when($id_pel && $no_meter, function ($query) use ($id_pel, $no_meter) {
+                // Jika keduanya diisi, gunakan OR
+                $query->where(function ($q) use ($id_pel, $no_meter) {
+                    $q->where('id_pel', $id_pel)
+                    ->orWhere('no_meter', $no_meter);
+                });
+            })
+            ->when($id_pel && !$no_meter, function ($query) use ($id_pel) {
+                $query->where('id_pel', $id_pel);
+            })
+            ->when($no_meter && !$id_pel, function ($query) use ($no_meter) {
+                $query->where('no_meter', $no_meter);
+            })
+            /*
+            ->where(function ($query) {
+                $query->whereNull('gambar_kwh')
+                    ->orWhere('gambar_kwh', '')
+                    ->orWhereNull('gambar_rumah')
+                    ->orWhere('gambar_rumah', '');
+            })
+            */
             ->get();
 
         if ($data->isNotEmpty()) {
             return response()->json([
                 'success' => true,
-                'html' => view('pelanggan.result-pelanggan', compact('data'))->render()
+                'html'    => view('pelanggan.result-pelanggan', compact('data'))->render()
             ]);
         }
 
         return response()->json([
             'success' => false,
-            'message' => 'Semua gambar lengkap, tidak ada data kosong.'
+            'html'    => '<p class="text-danger">Data pelanggan tidak ditemukan.</p>'
         ]);
     }
 
@@ -154,19 +174,23 @@ class PelangganController extends Controller
 
     public function updateImages(Request $request, $id)
     {
-         $pelanggan = Pelanggan::find($id);
+        $pelanggan = Pelanggan::find($id);
 
         if (!$pelanggan) {
             return response()->json(['message' => 'Pelanggan tidak ditemukan'], 404);
         }
 
+        // Validasi, pastikan gambar yang dikirim adalah string base64 yang valid atau penanda 'EXISTS_AND_UNCHANGED'
+        // Jika Anda menggunakan logika 'EXISTS_AND_UNCHANGED' dari frontend, validasi ini perlu disesuaikan.
+        // Untuk saat ini, asumsikan 'required' hanya jika ada pengiriman gambar baru.
+        // Atau ubah 'required' menjadi 'nullable' jika memungkinkan tidak mengirim gambar.
         $request->validate([
-            'gambar_kwh'   => 'required|string',
-            'gambar_rumah' => 'required|string',
+            'gambar_kwh'   => 'nullable|string', // Bisa null jika tidak ada perubahan
+            'gambar_rumah' => 'nullable|string', // Bisa null jika tidak ada perubahan
         ]);
 
         try {
-            // Fungsi menyimpan base64 ke storage menggunakan storeAs
+            // Fungsi menyimpan base64 ke storage
             $storeBase64Image = function (string $base64Image, string $folder, string $prefix) {
                 // Bersihkan header base64
                 $base64 = preg_replace('/^data:image\/[a-zA-Z]+;base64,/', '', $base64Image);
@@ -179,7 +203,8 @@ class PelangganController extends Controller
                 $tempPath = sys_get_temp_dir() . '/' . $filename;
                 file_put_contents($tempPath, base64_decode($base64));
 
-                // Gunakan storeAs seperti contoh Anda
+                // Gunakan storeAs
+                // Pastikan folder 'pelanggan' ada di disk 'public'
                 $storedPath = Storage::disk('public')
                     ->putFileAs("pelanggan/{$folder}", new \Illuminate\Http\File($tempPath), $filename);
 
@@ -189,13 +214,52 @@ class PelangganController extends Controller
                 return $storedPath; // Hanya path relatif dari 'public'
             };
 
-            // Simpan gambar KWH → pelanggan/kwh/
-            $gambarKWHPath = $storeBase64Image($request->gambar_kwh, 'kwh', 'kwh');
-            $pelanggan->gambar_kwh = $gambarKWHPath;
+            // --- Logika untuk Gambar KWH ---
+            // Cek apakah ada gambar KWH baru yang dikirim (bukan 'EXISTS_AND_UNCHANGED' atau null)
+            if ($request->has('gambar_kwh') && $request->gambar_kwh !== 'EXISTS_AND_UNCHANGED' && $request->gambar_kwh !== 'null') {
+                // Hapus gambar KWH lama jika ada
+                if ($pelanggan->gambar_kwh && Storage::disk('public')->exists($pelanggan->gambar_kwh)) {
+                    Storage::disk('public')->delete($pelanggan->gambar_kwh);
+                    \Log::info("Gambar KWH lama dihapus: {$pelanggan->gambar_kwh}");
+                }
 
-            // Simpan gambar Rumah → pelanggan/rumah/
-            $gambarRumahPath = $storeBase64Image($request->gambar_rumah, 'rumah', 'rumah');
-            $pelanggan->gambar_rumah = $gambarRumahPath;
+                // Simpan gambar KWH baru
+                $gambarKWHPath = $storeBase64Image($request->gambar_kwh, 'kwh', 'kwh');
+                $pelanggan->gambar_kwh = $gambarKWHPath;
+                \Log::info("Gambar KWH baru disimpan: {$gambarKWHPath}");
+
+            } elseif ($request->gambar_kwh === 'null') {
+                // Jika frontend secara eksplisit mengirim 'null', hapus gambar lama dan set path ke null
+                if ($pelanggan->gambar_kwh && Storage::disk('public')->exists($pelanggan->gambar_kwh)) {
+                    Storage::disk('public')->delete($pelanggan->gambar_kwh);
+                    \Log::info("Gambar KWH lama dihapus karena null: {$pelanggan->gambar_kwh}");
+                }
+                $pelanggan->gambar_kwh = null;
+            }
+
+
+            // --- Logika untuk Gambar Rumah ---
+            // Cek apakah ada gambar Rumah baru yang dikirim (bukan 'EXISTS_AND_UNCHANGED' atau null)
+            if ($request->has('gambar_rumah') && $request->gambar_rumah !== 'EXISTS_AND_UNCHANGED' && $request->gambar_rumah !== 'null') {
+                // Hapus gambar Rumah lama jika ada
+                if ($pelanggan->gambar_rumah && Storage::disk('public')->exists($pelanggan->gambar_rumah)) {
+                    Storage::disk('public')->delete($pelanggan->gambar_rumah);
+                    \Log::info("Gambar Rumah lama dihapus: {$pelanggan->gambar_rumah}");
+                }
+
+                // Simpan gambar Rumah baru
+                $gambarRumahPath = $storeBase64Image($request->gambar_rumah, 'rumah', 'rumah');
+                $pelanggan->gambar_rumah = $gambarRumahPath;
+                \Log::info("Gambar Rumah baru disimpan: {$gambarRumahPath}");
+
+            } elseif ($request->gambar_rumah === 'null') {
+                // Jika frontend secara eksplisit mengirim 'null', hapus gambar lama dan set path ke null
+                if ($pelanggan->gambar_rumah && Storage::disk('public')->exists($pelanggan->gambar_rumah)) {
+                    Storage::disk('public')->delete($pelanggan->gambar_rumah);
+                    \Log::info("Gambar Rumah lama dihapus karena null: {$pelanggan->gambar_rumah}");
+                }
+                $pelanggan->gambar_rumah = null;
+            }
 
             $pelanggan->save();
 

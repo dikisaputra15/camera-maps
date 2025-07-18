@@ -95,7 +95,8 @@
             <h1>Upload Gambar KWH dan Rumah</h1>
             {{-- Hidden input to store the customer ID passed from the route --}}
             {{-- Assumes route is something like /search-pelanggan/{id}/formupload --}}
-            <input type="hidden" id="pelangganId" value="{{ request()->route('id') }}">
+            {{-- Pastikan objek $pelanggan dilewatkan dari controller --}}
+            <input type="hidden" id="pelangganId" value="{{ $pelanggan->id }}">
         </div>
         <div class="section-body">
 
@@ -112,7 +113,15 @@
                 </div>
                 <div class="message" id="msgKWH">Status: Standby</div>
                 <div class="image-results">
-                    <img id="imageKWH" style="display: none;">
+                    {{-- Tampilkan gambar KWH yang sudah ada atau yang baru diambil di sini --}}
+                    <img id="imageKWH"
+                         @if(!empty($pelanggan->gambar_kwh))
+                             src="{{ asset('storage/' . $pelanggan->gambar_kwh) }}"
+                             style="display: block;"
+                         @else
+                             style="display: none;"
+                         @endif
+                    >
                     <div id="mapKWH" class="map-container" style="display: none;"></div>
                 </div>
             </div>
@@ -130,7 +139,15 @@
                 </div>
                 <div class="message" id="msgRumah">Status: Standby</div>
                 <div class="image-results">
-                    <img id="imageRumah" style="display: none;">
+                    {{-- Tampilkan gambar Rumah yang sudah ada atau yang baru diambil di sini --}}
+                    <img id="imageRumah"
+                         @if(!empty($pelanggan->gambar_rumah))
+                             src="{{ asset('storage/' . $pelanggan->gambar_rumah) }}"
+                             style="display: block;"
+                         @else
+                             style="display: none;"
+                         @endif
+                    >
                     <div id="mapRumah" class="map-container" style="display: none;"></div>
                 </div>
             </div>
@@ -146,30 +163,24 @@
 @endsection
 
 @push('scripts')
-{{-- PASTIKAN ANDA MENGGANTI SELURUH ISI DARI SINI --}}
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
     // --- Configuration ---
     const NOMINATIM_REVERSE_GEOCODING_API_URL = 'https://nominatim.openstreetmap.org/reverse';
     const LARAVEL_WEB_UPLOAD_URL = '/pelanggans/';
 
-    let capturedImageKWH = null;
-    let capturedImageRumah = null;
+    // Initialize capturedImage variables based on existing data
+    // Use 'EXISTS_AND_UNCHANGED' as a flag for images already in the database
+    // that haven't been re-captured in the current session.
+    let capturedImageKWH = '{{ !empty($pelanggan->gambar_kwh) ? "EXISTS_AND_UNCHANGED" : "null" }}';
+    let capturedImageRumah = '{{ !empty($pelanggan->gambar_rumah) ? "EXISTS_AND_UNCHANGED" : "null" }}';
 
     const pelangganId = document.getElementById('pelangganId').value;
     const submitAllImagesBtn = document.getElementById('submitAllImages');
     const submitMessageEl = document.getElementById('submitMessage');
 
-    // --- Helper Functions (DEFINISIKAN DULU SEMUA FUNGSI DI SINI) ---
+    // --- Helper Functions (Tetap sama seperti kode Anda sebelumnya) ---
 
-    /**
-     * Starts the camera feed.
-     * @param {HTMLVideoElement} video - The video element to display the camera feed.
-     * @param {HTMLCanvasElement} overlay - The canvas element for overlaying text.
-     * @param {HTMLElement} msgEl - The element to display status messages.
-     * @param {HTMLButtonElement} btnCapture - The capture button to enable/disable.
-     * @returns {Promise<MediaStream|null>} - The media stream if successful, null otherwise.
-     */
     async function startCamera(video, overlay, msgEl, btnCapture) {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
@@ -188,10 +199,6 @@
         }
     }
 
-    /**
-     * Retrieves current geographical location (latitude and longitude).
-     * @returns {Promise<{lat: string, lon: string}>} - A promise that resolves with latitude and longitude.
-     */
     function getLocationCoordinates() {
         return new Promise((resolve) => {
             navigator.geolocation.getCurrentPosition(
@@ -213,12 +220,6 @@
         });
     }
 
-    /**
-     * Performs reverse geocoding to get a human-readable address from coordinates using Nominatim.
-     * @param {string} lat - Latitude.
-     * @param {string} lon - Longitude.
-     * @returns {Promise<string>} - A promise that resolves with the formatted address or 'Lokasi tidak ditemukan'.
-     */
     async function getAddressFromCoordinates(lat, lon) {
         if (lat === 'N/A' || lon === 'N/A') {
             return 'Lokasi tidak tersedia';
@@ -250,13 +251,6 @@
         }
     }
 
-    /**
-     * Helper function to wrap text.
-     * @param {CanvasRenderingContext2D} context - The 2D rendering context of the canvas.
-     * @param {string} text - The text to wrap.
-     * @param {number} maxWidth - The maximum width for a line of text.
-     * @returns {string[]} - An array of strings, where each string is a line.
-     */
     function wrapText(context, text, maxWidth) {
         const words = text.split(' ');
         let line = '';
@@ -278,16 +272,6 @@
         return lines;
     }
 
-    /**
-     * Captures an image from the video stream, adds location and timestamp overlay, displays it,
-     * and stores the Data URL in a global variable.
-     * @param {HTMLVideoElement} video - The video element to capture from.
-     * @param {HTMLCanvasElement} overlay - The canvas element for live overlay.
-     * @param {HTMLImageElement} imgTarget - The image element to display the captured photo.
-     * @param {HTMLElement} msgEl - The element to display status messages.
-     * @param {HTMLElement} mapContainer - The div element for the map.
-     * @param {string} imageType - 'kwh' or 'rumah' (THIS PARAMETER IS CRUCIAL)
-     */
     async function captureImage(video, overlay, imgTarget, msgEl, mapContainer, imageType) {
         msgEl.innerText = "Mengambil foto dan lokasi...";
 
@@ -351,13 +335,11 @@
         imgTarget.src = imageDataURL;
         imgTarget.style.display = 'block';
 
-        // --- PENTING: Penyimpanan gambar ke variabel global ---
         if (imageType === 'kwh') {
             capturedImageKWH = imageDataURL;
         } else if (imageType === 'rumah') {
             capturedImageRumah = imageDataURL;
         }
-        // --- Akhir Bagian Penting ---
 
         msgEl.innerText = "Foto berhasil diambil dengan informasi lokasi.";
 
@@ -368,18 +350,9 @@
             mapContainer.style.display = 'none';
             console.warn("No valid coordinates to display map or map container not found.");
         }
-        // Panggil ini setelah gambar disimpan
-        checkSubmitButtonStatus(); // Ini akan mengaktifkan tombol simpan
+        checkSubmitButtonStatus();
     }
 
-
-    /**
-     * Initializes a Leaflet map in the specified container.
-     * @param {string} mapId - The ID of the div element to contain the map.
-     * @param {number} lat - Latitude.
-     * @param {number} lon - Longitude.
-     * @param {string} popupText - Text to display in the marker popup.
-     */
     let maps = {};
 
     function initializeLeafletMap(mapId, lat, lon, popupText) {
@@ -402,11 +375,6 @@
         maps[mapId] = map;
     }
 
-    /**
-     * Draws live location/time overlay on video feed.
-     * @param {HTMLVideoElement} video - The video element.
-     * @param {HTMLCanvasElement} overlay - The overlay canvas.
-     */
     function drawLiveOverlay(video, overlay) {
         const overlayCtx = overlay.getContext('2d');
         const draw = async () => {
@@ -446,11 +414,14 @@
         requestAnimationFrame(draw);
     }
 
-    /**
-     * Function to check if both images are captured and enable submit button.
-     */
     function checkSubmitButtonStatus() {
-        if (capturedImageKWH && capturedImageRumah && pelangganId) {
+        // Tombol submit aktif jika pelangganId ada DAN
+        // (capturedImageKWH tidak null/EXISTS_AND_UNCHANGED ATAU gambar KWH sebelumnya ada) DAN
+        // (capturedImageRumah tidak null/EXISTS_AND_UNCHANGED ATAU gambar Rumah sebelumnya ada)
+        const kwhReady = (capturedImageKWH !== null && capturedImageKWH !== "null");
+        const rumahReady = (capturedImageRumah !== null && capturedImageRumah !== "null");
+
+        if (pelangganId && kwhReady && rumahReady) {
             submitAllImagesBtn.disabled = false;
         } else {
             submitAllImagesBtn.disabled = true;
@@ -458,35 +429,52 @@
     }
 
 
-    /**
-     * Submits both captured images to the Laravel backend via a web route.
-     */
     async function uploadImages() {
         if (!pelangganId) {
             submitMessageEl.innerText = "ID Pelanggan tidak ditemukan. Tidak dapat menyimpan.";
+            submitMessageEl.style.color = 'red';
             return;
         }
 
-        if (!capturedImageKWH || !capturedImageRumah) {
-            submitMessageEl.innerText = "Harap ambil kedua foto (KWH dan Rumah) terlebih dahulu.";
+        const data = {};
+        let hasNewImage = false; // Flag untuk memeriksa apakah ada gambar baru yang diambil
+
+        // Hanya kirim gambar jika itu adalah gambar baru yang diambil
+        if (capturedImageKWH !== "null" && capturedImageKWH !== "EXISTS_AND_UNCHANGED") {
+            data.gambar_kwh = capturedImageKWH;
+            hasNewImage = true;
+        }
+        if (capturedImageRumah !== "null" && capturedImageRumah !== "EXISTS_AND_UNCHANGED") {
+            data.gambar_rumah = capturedImageRumah;
+            hasNewImage = true;
+        }
+
+        // Jika tidak ada gambar baru yang diambil dan tidak ada gambar sebelumnya, jangan submit
+        if (!hasNewImage && capturedImageKWH === "EXISTS_AND_UNCHANGED" && capturedImageRumah === "EXISTS_AND_UNCHANGED") {
+            submitMessageEl.innerText = "Tidak ada gambar baru untuk disimpan. Kedua gambar sudah ada.";
+            submitMessageEl.style.color = 'orange';
+            submitAllImagesBtn.disabled = false;
+            return;
+        } else if (!hasNewImage) {
+             submitMessageEl.innerText = "Harap ambil setidaknya satu foto baru jika belum ada gambar sebelumnya.";
+            submitMessageEl.style.color = 'orange';
+            submitAllImagesBtn.disabled = false;
             return;
         }
+
+
+        data._method = 'PUT';
 
         submitAllImagesBtn.disabled = true;
         submitMessageEl.innerText = "Menyimpan gambar, harap tunggu...";
-
-        const data = {
-            gambar_kwh: capturedImageKWH,
-            gambar_rumah: capturedImageRumah,
-            _method: 'PUT' // Penting untuk Laravel jika route Anda menggunakan PUT/PATCH
-        };
+        submitMessageEl.style.color = 'blue';
 
         try {
             const response = await fetch(`${LARAVEL_WEB_UPLOAD_URL}${pelangganId}/update-gambar`, {
-                method: 'POST', // Gunakan POST karena _method akan mengubahnya menjadi PUT di Laravel
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}' // Laravel CSRF Token
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
                 },
                 body: JSON.stringify(data)
             });
@@ -496,8 +484,10 @@
             if (response.ok) {
                 submitMessageEl.innerText = `Gambar berhasil disimpan! ${result.message || ''}`;
                 submitMessageEl.style.color = 'green';
-                // Opsional: Redirect atau refresh halaman setelah sukses
-                // window.location.href = `/pelanggans/${pelangganId}`;
+                // REFRESH HALAMAN SETELAH SUKSES
+                setTimeout(() => {
+                    location.reload();
+                }, 1500); // Beri sedikit waktu untuk pesan terlihat sebelum reload
             } else {
                 submitMessageEl.innerText = `Gagal menyimpan gambar: ${result.message || 'Terjadi kesalahan'}`;
                 submitMessageEl.style.color = 'red';
@@ -513,7 +503,7 @@
     }
 
 
-    // --- KWH Camera Setup (INILAH BAGIAN YANG MEMANGGIL FUNGSI) ---
+    // --- KWH Camera Setup ---
     const videoKWH = document.getElementById('videoKWH');
     const overlayKWH = document.getElementById('overlayKWH');
     const msgKWH = document.getElementById('msgKWH');
@@ -532,7 +522,7 @@
     });
 
     btnCaptureKWH.addEventListener('click', () => {
-        captureImage(videoKWH, overlayKWH, imgKWH, msgKWH, mapKWH, 'kwh'); // <-- PASTIKAN 'kwh' DIKIRIM
+        captureImage(videoKWH, overlayKWH, imgKWH, msgKWH, mapKWH, 'kwh');
         if (streamKWH) {
             streamKWH.getTracks().forEach(track => track.stop());
             videoKWH.srcObject = null;
@@ -560,7 +550,7 @@
     });
 
     btnCaptureRumah.addEventListener('click', () => {
-        captureImage(videoRumah, overlayRumah, imgRumah, msgRumah, mapRumah, 'rumah'); // <-- PASTIKAN 'rumah' DIKIRIM
+        captureImage(videoRumah, overlayRumah, imgRumah, msgRumah, mapRumah, 'rumah');
         if (streamRumah) {
             streamRumah.getTracks().forEach(track => track.stop());
             videoRumah.srcObject = null;
@@ -569,11 +559,23 @@
         }
     });
 
-    // Event listener untuk tombol "Simpan Semua Gambar"
     submitAllImagesBtn.addEventListener('click', uploadImages);
 
-    // Panggil ini saat halaman dimuat untuk mengatur status awal tombol
+    // Initial check when the page loads
     checkSubmitButtonStatus();
+
+    // Opsional: Inisialisasi peta jika ada koordinat yang tersimpan di database
+    @if(!empty($pelanggan->gambar_kwh) && !empty($pelanggan->kwh_latitude) && !empty($pelanggan->kwh_longitude))
+    document.addEventListener('DOMContentLoaded', () => {
+        initializeLeafletMap('mapKWH', parseFloat({{ $pelanggan->kwh_latitude }}), parseFloat({{ $pelanggan->kwh_longitude }}), 'Lokasi KWH Tersimpan');
+        document.getElementById('mapKWH').style.display = 'block';
+    });
+    @endif
+    @if(!empty($pelanggan->gambar_rumah) && !empty($pelanggan->rumah_latitude) && !empty($pelanggan->rumah_longitude))
+    document.addEventListener('DOMContentLoaded', () => {
+        initializeLeafletMap('mapRumah', parseFloat({{ $pelanggan->rumah_latitude }}), parseFloat({{ $pelanggan->rumah_longitude }}), 'Lokasi Rumah Tersimpan');
+        document.getElementById('mapRumah').style.display = 'block';
+    });
+    @endif
 </script>
-{{-- SAMPAI SINI --}}
 @endpush

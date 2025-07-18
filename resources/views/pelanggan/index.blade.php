@@ -25,6 +25,7 @@
                         <div class="mb-3 d-flex justify-content-end gap-3">
                             <a href="{{ route('pelanggan.create') }}" class="btn btn-primary btn-sm ml-2">Tambah data</a>
                         </div>
+                        <div class="table-responsive">
                         <table id="userTable" class="display">
                             <thead>
                                 <tr>
@@ -35,6 +36,7 @@
                                 </tr>
                             </thead>
                         </table>
+                        </div>
                     </div>
 
                 </div>
