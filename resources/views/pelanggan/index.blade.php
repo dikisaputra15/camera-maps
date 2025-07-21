@@ -5,6 +5,7 @@
     <!-- CSS Libraries -->
     <link rel="stylesheet"
         href="{{ asset('library/selectric/public/selectric.css') }}">
+
 @endpush
 @section('main')
     <div class="main-content">
@@ -32,6 +33,9 @@
                                     <th>No</th>
                                     <th>Id Pel</th>
                                     <th>No Meter</th>
+                                    <th>Gambar KWH</th>
+                                    <th>Gambar Rumah</th>
+                                    <th>Verified</th>
                                     <th>Aksi</th>
                                 </tr>
                             </thead>
@@ -82,6 +86,18 @@
                     {
                         data: 'no_meter',
                         name: 'no_meter'
+                    },
+                    {
+                        data: 'gambar_kwh',
+                        name: 'gambar_kwh'
+                    },
+                    {
+                        data: 'gambar_rumah',
+                        name: 'gambar_rumah'
+                    },
+                    {
+                        data: 'verified',
+                        name: 'verified'
                     },
                     {
                         data: 'action',

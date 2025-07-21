@@ -8,6 +8,8 @@ use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
 
 class PelangganController extends Controller
 {
@@ -21,11 +23,36 @@ class PelangganController extends Controller
 
           return DataTables::of($data)
             ->addIndexColumn()
+            ->addColumn('verified', function ($row) {
+                if ($row->verified) {
+                    return '<i class="fas fa-check-circle text-success" style="font-size: 20px;"></i>';
+                } else {
+                    return '<i class="fas fa-times-circle text-danger" style="font-size: 20px;"></i>';
+                }
+            })
+             ->addColumn('gambar_kwh', function ($row) {
+                    // Check if gambar_kwh exists and create an <img> tag
+                    if ($row->gambar_kwh) {
+                        // Use Storage::url() to get the public URL for the stored image
+                        // Assumes images are stored in storage/app/public/pelanggan/kwh/
+                        $imageUrl = Storage::url($row->gambar_kwh);
+                        return '<img src="' . $imageUrl . '" alt="Gambar KWH" style="width: 80px; height: 80px; object-fit: cover; border-radius: 4px;">';
+                    }
+                    return 'Tidak ada gambar'; // Or an empty string, or a placeholder image
+                })
+                ->addColumn('gambar_rumah', function ($row) {
+                    // Check if gambar_rumah exists and create an <img> tag
+                    if ($row->gambar_rumah) {
+                        $imageUrl = Storage::url($row->gambar_rumah);
+                        return '<img src="' . $imageUrl . '" alt="Gambar Rumah" style="width: 80px; height: 80px; object-fit: cover; border-radius: 4px;">';
+                    }
+                    return 'Tidak ada gambar'; // Or an empty string, or a placeholder image
+                })
             ->addColumn('action', function ($row) {
                 return '<a href="' . route('pelanggan.edit', $row->id) . '" class="btn btn-primary btn-sm">Edit</a>
                         <button class="btn btn-sm btn-danger delete-btn" data-id="'.$row->id.'">Delete</button>';
             })
-            ->rawColumns(['action'])
+            ->rawColumns(['verified','gambar_kwh','gambar_rumah','action'])
             ->make(true);
 
         }
@@ -153,7 +180,7 @@ class PelangganController extends Controller
         return view('pelanggan.formupload', compact('pelanggan'));
     }
 
-    public function updateImages(Request $request, $id)
+   public function updateImages(Request $request, $id)
     {
         $pelanggan = Pelanggan::find($id);
 
@@ -161,87 +188,70 @@ class PelangganController extends Controller
             return response()->json(['message' => 'Pelanggan tidak ditemukan'], 404);
         }
 
-        // Validasi, pastikan gambar yang dikirim adalah string base64 yang valid atau penanda 'EXISTS_AND_UNCHANGED'
-        // Jika Anda menggunakan logika 'EXISTS_AND_UNCHANGED' dari frontend, validasi ini perlu disesuaikan.
-        // Untuk saat ini, asumsikan 'required' hanya jika ada pengiriman gambar baru.
-        // Atau ubah 'required' menjadi 'nullable' jika memungkinkan tidak mengirim gambar.
         $request->validate([
-            'gambar_kwh'   => 'nullable|string', // Bisa null jika tidak ada perubahan
-            'gambar_rumah' => 'nullable|string', // Bisa null jika tidak ada perubahan
+            'gambar_kwh'     => 'nullable|string',
+            'gambar_rumah'   => 'nullable|string',
+            'difoto_oleh'    => 'nullable|string',
+            'tanggal_foto'   => 'nullable|date',
+            'kwh_latitude'   => 'nullable|numeric',
+            'kwh_longitude'  => 'nullable|numeric',
         ]);
 
+        $verified = true;
+
         try {
-            // Fungsi menyimpan base64 ke storage
             $storeBase64Image = function (string $base64Image, string $folder, string $prefix) {
-                // Bersihkan header base64
                 $base64 = preg_replace('/^data:image\/[a-zA-Z]+;base64,/', '', $base64Image);
                 $base64 = str_replace(' ', '+', $base64);
-
-                // Nama file unik
                 $filename = $prefix . '_' . Str::uuid() . '.png';
-
-                // Simpan ke file sementara
                 $tempPath = sys_get_temp_dir() . '/' . $filename;
                 file_put_contents($tempPath, base64_decode($base64));
-
-                // Gunakan storeAs
-                // Pastikan folder 'pelanggan' ada di disk 'public'
-                $storedPath = Storage::disk('public')
-                    ->putFileAs("pelanggan/{$folder}", new \Illuminate\Http\File($tempPath), $filename);
-
-                // Hapus file temp
+                $storedPath = Storage::disk('public')->putFileAs("pelanggan/{$folder}", new \Illuminate\Http\File($tempPath), $filename);
                 unlink($tempPath);
-
-                return $storedPath; // Hanya path relatif dari 'public'
+                return $storedPath;
             };
 
-            // --- Logika untuk Gambar KWH ---
-            // Cek apakah ada gambar KWH baru yang dikirim (bukan 'EXISTS_AND_UNCHANGED' atau null)
+            // ---------- Gambar KWH ----------
             if ($request->has('gambar_kwh') && $request->gambar_kwh !== 'EXISTS_AND_UNCHANGED' && $request->gambar_kwh !== 'null') {
-                // Hapus gambar KWH lama jika ada
                 if ($pelanggan->gambar_kwh && Storage::disk('public')->exists($pelanggan->gambar_kwh)) {
                     Storage::disk('public')->delete($pelanggan->gambar_kwh);
-                    \Log::info("Gambar KWH lama dihapus: {$pelanggan->gambar_kwh}");
+                    $verified = false;
                 }
-
-                // Simpan gambar KWH baru
-                $gambarKWHPath = $storeBase64Image($request->gambar_kwh, 'kwh', 'kwh');
-                $pelanggan->gambar_kwh = $gambarKWHPath;
-                \Log::info("Gambar KWH baru disimpan: {$gambarKWHPath}");
+                $pelanggan->gambar_kwh = $storeBase64Image($request->gambar_kwh, 'kwh', 'kwh');
 
             } elseif ($request->gambar_kwh === 'null') {
-                // Jika frontend secara eksplisit mengirim 'null', hapus gambar lama dan set path ke null
                 if ($pelanggan->gambar_kwh && Storage::disk('public')->exists($pelanggan->gambar_kwh)) {
                     Storage::disk('public')->delete($pelanggan->gambar_kwh);
-                    \Log::info("Gambar KWH lama dihapus karena null: {$pelanggan->gambar_kwh}");
+                    $verified = false;
                 }
                 $pelanggan->gambar_kwh = null;
             }
 
-
-            // --- Logika untuk Gambar Rumah ---
-            // Cek apakah ada gambar Rumah baru yang dikirim (bukan 'EXISTS_AND_UNCHANGED' atau null)
+            // ---------- Gambar Rumah ----------
             if ($request->has('gambar_rumah') && $request->gambar_rumah !== 'EXISTS_AND_UNCHANGED' && $request->gambar_rumah !== 'null') {
-                // Hapus gambar Rumah lama jika ada
                 if ($pelanggan->gambar_rumah && Storage::disk('public')->exists($pelanggan->gambar_rumah)) {
                     Storage::disk('public')->delete($pelanggan->gambar_rumah);
-                    \Log::info("Gambar Rumah lama dihapus: {$pelanggan->gambar_rumah}");
+                    $verified = false;
                 }
-
-                // Simpan gambar Rumah baru
-                $gambarRumahPath = $storeBase64Image($request->gambar_rumah, 'rumah', 'rumah');
-                $pelanggan->gambar_rumah = $gambarRumahPath;
-                \Log::info("Gambar Rumah baru disimpan: {$gambarRumahPath}");
-
+                $pelanggan->gambar_rumah = $storeBase64Image($request->gambar_rumah, 'rumah', 'rumah');
             } elseif ($request->gambar_rumah === 'null') {
-                // Jika frontend secara eksplisit mengirim 'null', hapus gambar lama dan set path ke null
                 if ($pelanggan->gambar_rumah && Storage::disk('public')->exists($pelanggan->gambar_rumah)) {
                     Storage::disk('public')->delete($pelanggan->gambar_rumah);
-                    \Log::info("Gambar Rumah lama dihapus karena null: {$pelanggan->gambar_rumah}");
+                    $verified = false;
                 }
                 $pelanggan->gambar_rumah = null;
             }
 
+            // ---------- Lokasi ----------
+            if ($request->kwh_latitude && $request->kwh_longitude) {
+                $pelanggan->kwh_latitude = $request->kwh_latitude;
+                $pelanggan->kwh_longitude = $request->kwh_longitude;
+            }
+
+
+            $pelanggan->difoto_oleh = auth()->user()->name;
+            $pelanggan->tanggal_foto = now('Asia/Jakarta');
+            $pelanggan->verified = $verified;
             $pelanggan->save();
 
             return response()->json(['message' => 'Gambar berhasil diupdate'], 200);
@@ -251,4 +261,5 @@ class PelangganController extends Controller
             return response()->json(['message' => 'Gagal mengupdate gambar.'], 500);
         }
     }
+
 }

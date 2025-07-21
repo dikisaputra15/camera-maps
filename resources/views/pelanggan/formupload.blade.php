@@ -100,6 +100,13 @@
         </div>
         <div class="section-body">
 
+            <div class="col-md-12 mb-3">
+                <label for="kendaraan" class="form-label">Difoto Oleh : {{ $pelanggan->difoto_oleh }}</label>
+            </div>
+            <div class="col-md-12 mb-3">
+                <label for="kendaraan" class="form-label">Tanggal Foto : {{ $pelanggan->tanggal_foto }}</label>
+            </div>
+
             {{-- CAMERA SECTION KWH --}}
             <div class="camera-section">
                 <h3>Foto KWH</h3>
@@ -122,7 +129,13 @@
                              style="display: none;"
                          @endif
                     >
-                    <div id="mapKWH" class="map-container" style="display: none;"></div>
+                    <div id="mapKWH" class="map-container"
+                         @if(!empty($pelanggan->kwh_latitude) && !empty($pelanggan->kwh_longitude))
+                             style="display: block;"
+                         @else
+                             style="display: none;"
+                         @endif >
+                    </div>
                 </div>
             </div>
 
@@ -174,6 +187,10 @@
     // that haven't been re-captured in the current session.
     let capturedImageKWH = '{{ !empty($pelanggan->gambar_kwh) ? "EXISTS_AND_UNCHANGED" : "null" }}';
     let capturedImageRumah = '{{ !empty($pelanggan->gambar_rumah) ? "EXISTS_AND_UNCHANGED" : "null" }}';
+
+     // Store KWH Lat/Lon if they exist
+    let kwhLat = @json($pelanggan->kwh_latitude);
+    let kwhLon = @json($pelanggan->kwh_longitude);
 
     const pelangganId = document.getElementById('pelangganId').value;
     const submitAllImagesBtn = document.getElementById('submitAllImages');
@@ -337,6 +354,8 @@
 
         if (imageType === 'kwh') {
             capturedImageKWH = imageDataURL;
+            kwhLat = lat;
+            kwhLon = lon;
         } else if (imageType === 'rumah') {
             capturedImageRumah = imageDataURL;
         }
@@ -442,6 +461,8 @@
         // Hanya kirim gambar jika itu adalah gambar baru yang diambil
         if (capturedImageKWH !== "null" && capturedImageKWH !== "EXISTS_AND_UNCHANGED") {
             data.gambar_kwh = capturedImageKWH;
+            data.kwh_latitude = kwhLat;
+            data.kwh_longitude = kwhLon;
             hasNewImage = true;
         }
         if (capturedImageRumah !== "null" && capturedImageRumah !== "EXISTS_AND_UNCHANGED") {
@@ -485,9 +506,7 @@
                 submitMessageEl.innerText = `Gambar berhasil disimpan! ${result.message || ''}`;
                 submitMessageEl.style.color = 'green';
                 // REFRESH HALAMAN SETELAH SUKSES
-                setTimeout(() => {
-                    location.reload();
-                }, 1500); // Beri sedikit waktu untuk pesan terlihat sebelum reload
+                window.location.href = "{{ url('/searchdatapelanggan') }}";
             } else {
                 submitMessageEl.innerText = `Gagal menyimpan gambar: ${result.message || 'Terjadi kesalahan'}`;
                 submitMessageEl.style.color = 'red';
@@ -567,15 +586,10 @@
     // Opsional: Inisialisasi peta jika ada koordinat yang tersimpan di database
     @if(!empty($pelanggan->gambar_kwh) && !empty($pelanggan->kwh_latitude) && !empty($pelanggan->kwh_longitude))
     document.addEventListener('DOMContentLoaded', () => {
-        initializeLeafletMap('mapKWH', parseFloat({{ $pelanggan->kwh_latitude }}), parseFloat({{ $pelanggan->kwh_longitude }}), 'Lokasi KWH Tersimpan');
+        initializeLeafletMap('mapKWH', parseFloat({{ $pelanggan->kwh_latitude }}), parseFloat({{ $pelanggan->kwh_longitude }}), 'KWH Tersimpan');
         document.getElementById('mapKWH').style.display = 'block';
     });
     @endif
-    @if(!empty($pelanggan->gambar_rumah) && !empty($pelanggan->rumah_latitude) && !empty($pelanggan->rumah_longitude))
-    document.addEventListener('DOMContentLoaded', () => {
-        initializeLeafletMap('mapRumah', parseFloat({{ $pelanggan->rumah_latitude }}), parseFloat({{ $pelanggan->rumah_longitude }}), 'Lokasi Rumah Tersimpan');
-        document.getElementById('mapRumah').style.display = 'block';
-    });
-    @endif
+
 </script>
 @endpush
