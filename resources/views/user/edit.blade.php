@@ -44,6 +44,18 @@
                         <input type="password" name="password_confirmation" class="form-control" placeholder="Ulangi password">
                     </div>
 
+                    <div class="form-group">
+                                <label class="form-label">Role Akses</label>
+                                <select name="role" class="form-control @error('role') is-invalid @enderror">
+                                    <option value="">-- Pilih Role --</option>
+                                    @foreach($roles as $role)
+                                        <option value="{{ $role }}" {{ $user->hasRole($role) ? 'selected' : '' }}>
+                                            {{ ucfirst($role) }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('role') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    </div>
 
                         <button class="btn btn-primary">Simpan</button>
                         <a href="{{ route('users.index') }}" class="btn btn-secondary">Batal</a>

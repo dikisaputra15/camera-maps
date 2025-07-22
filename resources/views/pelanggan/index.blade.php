@@ -97,7 +97,14 @@
                     },
                     {
                         data: 'verified',
-                        name: 'verified'
+                        name: 'verified',
+                        orderable: false,
+                        searchable: false,
+                        render: function(data, type, row) {
+                            // Render checkbox based on the 'verified' status
+                            let checked = data ? 'checked' : '';
+                            return `<input type="checkbox" class="verified-checkbox" data-id="${row.id}" ${checked}>`;
+                        }
                     },
                     {
                         data: 'action',
@@ -108,6 +115,41 @@
                 ]
             });
 
+        $('#userTable').on('change', '.verified-checkbox', function () {
+                const userId = $(this).data('id');
+                const isVerified = $(this).is(':checked');
+                const $thisCheckbox = $(this);
+
+                $.ajax({
+                    url: `/pelanggan/${userId}/update-verified`,
+                    type: 'PUT',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        verified: isVerified
+                    }),
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    success: function (response) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Sukses!',
+                            text: response.message,
+                            timer: 2000,
+                            showConfirmButton: false
+                        });
+                         $('#userTable').DataTable().ajax.reload(null, false);
+                    },
+                    error: function () {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Gagal memperbarui status verifikasi.',
+                        });
+                        $thisCheckbox.prop('checked', !isVerified);
+                    }
+                });
+            });
 
             // Event listener untuk tombol hapus
             $('#userTable').on('click', '.delete-btn', function () {

@@ -20,4 +20,5 @@ Route::get('searchdatapelanggan', [PelangganController::class, 'formsearch'])->m
 Route::post('/search-pelanggan', [PelangganController::class, 'searchPelanggan'])->name('search.pelanggan')->middleware(['auth']);
 Route::get('search-pelanggan/{id}/formupload', [PelangganController::class, 'formupload'])->middleware(['auth']);
 Route::put('/pelanggans/{id}/update-gambar', [PelangganController::class, 'updateImages'])->name('pelanggans.update_images')->middleware(['auth']);
+Route::put('/pelanggan/{id}/update-verified', [PelangganController::class, 'updateVerified'])->name('pelanggan.updateVerified');
 

@@ -24,11 +24,7 @@ class PelangganController extends Controller
           return DataTables::of($data)
             ->addIndexColumn()
             ->addColumn('verified', function ($row) {
-                if ($row->verified) {
-                    return '<i class="fas fa-check-circle text-success" style="font-size: 20px;"></i>';
-                } else {
-                    return '<i class="fas fa-times-circle text-danger" style="font-size: 20px;"></i>';
-                }
+                return (bool) $row->verified;
             })
              ->addColumn('gambar_kwh', function ($row) {
                     // Check if gambar_kwh exists and create an <img> tag
@@ -197,8 +193,6 @@ class PelangganController extends Controller
             'kwh_longitude'  => 'nullable|numeric',
         ]);
 
-        $verified = true;
-
         try {
             $storeBase64Image = function (string $base64Image, string $folder, string $prefix) {
                 $base64 = preg_replace('/^data:image\/[a-zA-Z]+;base64,/', '', $base64Image);
@@ -215,14 +209,12 @@ class PelangganController extends Controller
             if ($request->has('gambar_kwh') && $request->gambar_kwh !== 'EXISTS_AND_UNCHANGED' && $request->gambar_kwh !== 'null') {
                 if ($pelanggan->gambar_kwh && Storage::disk('public')->exists($pelanggan->gambar_kwh)) {
                     Storage::disk('public')->delete($pelanggan->gambar_kwh);
-                    $verified = false;
                 }
                 $pelanggan->gambar_kwh = $storeBase64Image($request->gambar_kwh, 'kwh', 'kwh');
 
             } elseif ($request->gambar_kwh === 'null') {
                 if ($pelanggan->gambar_kwh && Storage::disk('public')->exists($pelanggan->gambar_kwh)) {
                     Storage::disk('public')->delete($pelanggan->gambar_kwh);
-                    $verified = false;
                 }
                 $pelanggan->gambar_kwh = null;
             }
@@ -231,13 +223,11 @@ class PelangganController extends Controller
             if ($request->has('gambar_rumah') && $request->gambar_rumah !== 'EXISTS_AND_UNCHANGED' && $request->gambar_rumah !== 'null') {
                 if ($pelanggan->gambar_rumah && Storage::disk('public')->exists($pelanggan->gambar_rumah)) {
                     Storage::disk('public')->delete($pelanggan->gambar_rumah);
-                    $verified = false;
                 }
                 $pelanggan->gambar_rumah = $storeBase64Image($request->gambar_rumah, 'rumah', 'rumah');
             } elseif ($request->gambar_rumah === 'null') {
                 if ($pelanggan->gambar_rumah && Storage::disk('public')->exists($pelanggan->gambar_rumah)) {
                     Storage::disk('public')->delete($pelanggan->gambar_rumah);
-                    $verified = false;
                 }
                 $pelanggan->gambar_rumah = null;
             }
@@ -251,7 +241,7 @@ class PelangganController extends Controller
 
             $pelanggan->difoto_oleh = auth()->user()->name;
             $pelanggan->tanggal_foto = now('Asia/Jakarta');
-            $pelanggan->verified = $verified;
+            $pelanggan->verified = false;
             $pelanggan->save();
 
             return response()->json(['message' => 'Gambar berhasil diupdate'], 200);
@@ -261,5 +251,23 @@ class PelangganController extends Controller
             return response()->json(['message' => 'Gagal mengupdate gambar.'], 500);
         }
     }
+
+  public function updateVerified(Request $request, $id)
+{
+    $pelanggan = Pelanggan::find($id);
+
+    if (!$pelanggan) {
+        return response()->json(['success' => false, 'message' => 'Data tidak ditemukan.'], 404);
+    }
+
+    $pelanggan->verified = $request->verified ? true : false;
+
+    if ($pelanggan->save()) {
+        return response()->json(['success' => true, 'message' => 'Status verifikasi berhasil diperbarui.']);
+    }
+
+    return response()->json(['success' => false, 'message' => 'Gagal memperbarui status verifikasi.'], 500);
+}
+
 
 }

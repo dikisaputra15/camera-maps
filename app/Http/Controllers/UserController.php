@@ -37,8 +37,10 @@ class UserController extends Controller
      */
     public function create()
     {
+        $roles = Role::pluck('name');
         return view('user.create', [
-            'title' => "Create User"
+            'title' => "Create User",
+            'roles' => $roles
         ]);
     }
 
@@ -53,8 +55,7 @@ class UserController extends Controller
             'password' => Hash::make($request->password),
         ]);
 
-        $userRole = Role::firstOrCreate(['name' => 'user']);
-        $user->assignRole($userRole);
+        $user->assignRole($request->role);
 
         return redirect()->route('users.index')->with('success', 'User berhasil ditambahkan.');
     }
@@ -72,7 +73,8 @@ class UserController extends Controller
      */
     public function edit(User $user)
     {
-        return view('user.edit', compact('user'));
+         $roles = Role::pluck('name');
+        return view('user.edit', compact('user','roles'));
     }
 
     /**
@@ -94,6 +96,7 @@ class UserController extends Controller
         }
 
         $user->save();
+        $user->syncRoles([$request->role]);
 
         return redirect()->route('users.index')->with('success', 'User berhasil diperbarui.');
     }
