@@ -331,7 +331,7 @@
 <script>
     // --- Configuration ---
     const NOMINATIM_REVERSE_GEOCODING_API_URL = 'https://nominatim.openstreetmap.org/reverse';
-    const LARAVEL_WEB_UPLOAD_URL = "{{ url('/pelanggans/') }}/";
+    const LARAVEL_WEB_UPLOAD_URL = "/pelanggans/";
 
     // Initialize capturedImage variables based on existing data
     let capturedImageKWH = '{{ !empty($pelanggan->gambar_kwh) ? "EXISTS_AND_UNCHANGED" : "null" }}';
