@@ -32,6 +32,7 @@
                                     <th>No</th>
                                     <th>Nama</th>
                                     <th>Email</th>
+                                    <th>Role</th>
                                     <th>Aksi</th>
                                 </tr>
                             </thead>
@@ -82,6 +83,10 @@
                     {
                         data: 'email',
                         name: 'email'
+                    },
+                    {
+                        data: 'roles',
+                        name: 'roles'
                     },
                     {
                         data: 'action',

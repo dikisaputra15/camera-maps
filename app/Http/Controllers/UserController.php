@@ -16,10 +16,13 @@ class UserController extends Controller
     public function index(Request $request)
     {
         if ($request->ajax()) {
-            $data = User::all();
+            $data = User::with('roles');
 
           return DataTables::of($data)
             ->addIndexColumn()
+            ->addColumn('roles', function ($user) {
+                return $user->getRoleNames()->join(', ');
+            })
             ->addColumn('action', function ($row) {
                 return '<a href="' . route('users.edit', $row->id) . '" class="btn btn-primary btn-sm">Edit</a>';
             })
@@ -29,6 +32,7 @@ class UserController extends Controller
         }
         return view('user.index', [
                 'title' => "User",
+                'roles' => Role::all(),
         ]);
     }
 

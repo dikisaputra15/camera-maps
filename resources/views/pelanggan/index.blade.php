@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'Users')
+@section('title', 'Pelanggan')
 
 @push('style')
     <!-- CSS Libraries -->
@@ -26,6 +26,16 @@
                         <div class="mb-3 d-flex justify-content-end gap-3">
                             <a href="{{ route('pelanggan.create') }}" class="btn btn-primary btn-sm ml-2">Tambah data</a>
                         </div>
+
+                         <div class="mb-3">
+                            <button class="btn btn-warning btn-icon upload-btn d-inline ml-2">
+                                <i class="fas fa-upload"></i> Import Excel
+                            </button>
+                            <a href="{{ route('plg.export') }}" class="btn btn-success btn-sm me-2">
+                                <i class="fas fa-file-excel"></i> Export Excel
+                            </a>
+                        </div>
+
                         <div class="table-responsive">
                         <table id="userTable" class="display">
                             <thead>
@@ -33,8 +43,24 @@
                                     <th>No</th>
                                     <th>Id Pel</th>
                                     <th>No Meter</th>
+                                    <th>Nama</th>
+                                    <th>Tarif</th>
+                                    <th>Daya</th>
+                                    <th>Jenis Layanan</th>
+                                    <th>Alamat</th>
+                                    <th>RT</th>
+                                    <th>RW</th>
+                                    <th>Hasil Kunjungan</th>
+                                    <th>Telephone</th>
+                                    <th>Kabel SL</th>
+                                    <th>Jenis Sambungan</th>
+                                    <th>Merek MCB</th>
+                                    <th>Ampere MCB</th>
+                                    <th>Gardu MCB</th>
                                     <th>Gambar KWH</th>
                                     <th>Gambar Rumah</th>
+                                    <th>Gambar SR</th>
+                                    <th>Gambar Tiang</th>
                                     <th>Verified</th>
                                     <th>Aksi</th>
                                 </tr>
@@ -49,9 +75,45 @@
         </section>
 
     </div>
+
+     <!-- Modal Upload -->
+      <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="uploadModalLabel">Import File Excel</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">X</button>
+                </div>
+                <form action="{{ route('plg.import') }}" method="POST" enctype="multipart/form-data">
+                    @csrf
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="file" class="form-label">Pilih File</label>
+                            <input type="file" class="form-control" name="file" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-primary">Upload</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @push('scripts')
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        document.querySelectorAll(".upload-btn").forEach(button => {
+            button.addEventListener("click", function() {
+                let uploadModal = new bootstrap.Modal(document.getElementById("uploadModal"));
+                uploadModal.show();
+            });
+        });
+    });
+</script>
 
     <script>
         $(document).ready(function() {
@@ -88,12 +150,76 @@
                         name: 'no_meter'
                     },
                     {
+                        data: 'nama',
+                        name: 'nama'
+                    },
+                    {
+                        data: 'tarif',
+                        name: 'tarif'
+                    },
+                    {
+                        data: 'daya',
+                        name: 'daya'
+                    },
+                    {
+                        data: 'jenis_layanan',
+                        name: 'jenis_layanan'
+                    },
+                    {
+                        data: 'alamat',
+                        name: 'alamat'
+                    },
+                    {
+                        data: 'rt',
+                        name: 'rt'
+                    },
+                    {
+                        data: 'rw',
+                        name: 'rw'
+                    },
+                    {
+                        data: 'hasil_kunjungan',
+                        name: 'hasil_kunjungan'
+                    },
+                    {
+                        data: 'telp',
+                        name: 'telp'
+                    },
+                    {
+                        data: 'kabel_sl',
+                        name: 'kabel_sl'
+                    },
+                    {
+                        data: 'jenis_sambungan',
+                        name: 'jenis_sambungan'
+                    },
+                    {
+                        data: 'merk_mcb',
+                        name: 'merk_mcb'
+                    },
+                    {
+                        data: 'ampere_mcb',
+                        name: 'ampere_mcb'
+                    },
+                    {
+                        data: 'gardu',
+                        name: 'gardu'
+                    },
+                    {
                         data: 'gambar_kwh',
                         name: 'gambar_kwh'
                     },
                     {
                         data: 'gambar_rumah',
                         name: 'gambar_rumah'
+                    },
+                    {
+                        data: 'gambar_sr',
+                        name: 'gambar_sr'
+                    },
+                    {
+                        data: 'gambar_tiang',
+                        name: 'gambar_tiang'
                     },
                     {
                         data: 'verified',
