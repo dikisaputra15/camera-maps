@@ -134,6 +134,8 @@ class PelangganController extends Controller
 
         $pelanggan->id_pel = $request->id_pel;
         $pelanggan->no_meter = $request->no_meter;
+        $pelanggan->difoto_oleh = $request->difoto_oleh;
+        $pelanggan->tanggal_foto = $request->tanggal_foto;
         $pelanggan->nama = $request->nama;
         $pelanggan->tarif = $request->tarif;
         $pelanggan->daya = $request->daya;
@@ -141,6 +143,13 @@ class PelangganController extends Controller
         $pelanggan->alamat = $request->alamat;
         $pelanggan->rt = $request->rt;
         $pelanggan->rw = $request->rw;
+        $pelanggan->hasil_kunjungan = $request->hasil_kunjungan;
+        $pelanggan->telp = $request->telp;
+        $pelanggan->kabel_sl = $request->kabel_sl;
+        $pelanggan->jenis_sambungan = $request->jenis_sambungan;
+        $pelanggan->merk_mcb = $request->merk_mcb;
+        $pelanggan->ampere_mcb = $request->ampere_mcb;
+        $pelanggan->gardu = $request->gardu;
         $pelanggan->verified = $request->has('verified');
 
         $pelanggan->save();
@@ -367,7 +376,7 @@ class PelangganController extends Controller
     public function exportExcel()
     {
         // Nama file yang akan diunduh oleh pengguna
-        $fileName = 'data_pelanggan_dengan_gambar_' . date('Ymd_His') . '.xlsx';
+        $fileName = 'data_pelanggan_' . date('Ymd_His') . '.xlsx';
 
         // Unduh file Excel
         return Excel::download(new PelangganExport, $fileName);

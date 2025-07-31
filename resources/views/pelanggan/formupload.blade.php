@@ -254,6 +254,7 @@
                 </div>
             </div>
 
+            @role('admin')
             {{-- NEW CAMERA SECTION SR --}}
             <div class="camera-section">
                 <h3>Foto SR</h3>
@@ -315,6 +316,7 @@
                     ></div>
                 </div>
             </div>
+            @endrole
 
             <div class="text-center mt-4">
                 <button id="submitAllImages" class="btn btn-submit" disabled>Simpan Semua Gambar</button>

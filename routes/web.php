@@ -22,5 +22,5 @@ Route::get('search-pelanggan/{id}/formupload', [PelangganController::class, 'for
 Route::put('/pelanggans/{id}/update-gambar', [PelangganController::class, 'updateImages'])->name('pelanggans.update_images')->middleware(['auth']);
 Route::put('/pelanggan/{id}/update-verified', [PelangganController::class, 'updateVerified'])->name('pelanggan.updateVerified');
 Route::post('/pelangganimport', [PelangganController::class, 'import'])->name('plg.import')->middleware(['auth']);
-Route::get('/pelanggan/export-excel', [PelangganController::class, 'exportExcel'])->name('plg.export')->middleware(['auth']);
+Route::get('/pelangganexport', [PelangganController::class, 'exportExcel'])->name('plg.export')->middleware(['auth']);
 

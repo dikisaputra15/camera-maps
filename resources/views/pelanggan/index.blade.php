@@ -61,6 +61,8 @@
                                     <th>Gambar Rumah</th>
                                     <th>Gambar SR</th>
                                     <th>Gambar Tiang</th>
+                                    <th>Difoto Oleh</th>
+                                    <th>Tanggal Foto</th>
                                     <th>Verified</th>
                                     <th>Aksi</th>
                                 </tr>
@@ -220,6 +222,14 @@
                     {
                         data: 'gambar_tiang',
                         name: 'gambar_tiang'
+                    },
+                    {
+                        data: 'difoto_oleh',
+                        name: 'difoto_oleh'
+                    },
+                    {
+                        data: 'tanggal_foto',
+                        name: 'tanggal_foto'
                     },
                     {
                         data: 'verified',

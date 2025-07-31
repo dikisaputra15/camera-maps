@@ -72,11 +72,10 @@
 
                                  <div class="col-md-12 mb-3">
                                     <label for="kendaraan" class="form-label">Jenis Layanan</label>
-                                    <input type="text" class="form-control @error('jenis_layanan') is-invalid @enderror"
-                                        id="jenis_layanan" name="jenis_layanan" value="{{ old('jenis_layanan') }}" required>
-                                    @error('jenis_layanan')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
+                                   <select class="form-control" name="jenis_layanan">
+                                        <option value="Prabayar">Prabayar</option>
+                                        <option value="Pascabayar">Pascabayar</option>
+                                   </select>
                                 </div>
 
                                   <div class="col-md-12 mb-3">
