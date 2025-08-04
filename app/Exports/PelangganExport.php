@@ -12,9 +12,13 @@ use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithStyles; // Tetap gunakan ini
 use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet; // Tambahkan ini
+use Maatwebsite\Excel\Concerns\Exportable;
+use Maatwebsite\Excel\Concerns\WithChunkReading;
+use Maatwebsite\Excel\Concerns\ShouldQueue;
 
-class PelangganExport implements FromCollection, WithHeadings, WithMapping, WithDrawings, ShouldAutoSize, WithStyles // Hapus WithCustomRowHeight
+class PelangganExport implements FromCollection, WithHeadings, WithMapping, WithDrawings, ShouldAutoSize, WithStyles, WithChunkReading, ShouldQueue
 {
+    use Exportable;
     protected $data;
     private $imageHeight = 80; // Tentukan tinggi gambar yang konsisten dalam piksel
 
@@ -148,5 +152,10 @@ class PelangganExport implements FromCollection, WithHeadings, WithMapping, With
         }
 
         return $drawings;
+    }
+
+    public function chunkSize(): int
+    {
+        return 1000;
     }
 }

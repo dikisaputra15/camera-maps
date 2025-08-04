@@ -366,11 +366,29 @@ class PelangganController extends Controller
     return response()->json(['success' => false, 'message' => 'Gagal memperbarui status verifikasi.'], 500);
 }
 
-  public function import(Request $request)
+    public function import(Request $request)
     {
-        Excel::import(new PelangganImport, $request->file('file'));
+        try {
+            $request->validate([
+                'file' => 'required|file|mimes:xlsx,csv,xls|max:51200' // 50MB max (50*1024 KB)
+            ]);
 
-        return redirect()->back()->with('success', 'Data berhasil diimport dan diperbarui!');
+            $file = $request->file('file');
+
+            // Antrikan proses import ke queue
+            Excel::queueImport(new PelangganImport, $file);
+
+            return response()->json([
+                'message' => 'Data berhasil diimpor!'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Excel import error: ' . $e->getMessage());
+
+            return response()->json([
+                'message' => 'Import failed. ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     public function exportExcel()
