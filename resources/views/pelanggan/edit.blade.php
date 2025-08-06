@@ -34,19 +34,6 @@
                             <input type="text" name="no_meter" value="{{ old('no_meter', $pelanggan->no_meter) }}" class="form-control" required>
                         </div>
 
-
-                        <div class="form-group">
-                            <label>Difoto Oleh</label>
-                            <input type="text" name="difoto_oleh" value="{{ old('difoto_oleh', $pelanggan->difoto_oleh) }}" class="form-control" required>
-                        </div>
-
-                         <div class="form-group">
-                            <label>Tanggal Foto</label>
-                           <input type="datetime-local" name="tanggal_foto"
-                            value="{{ old('tanggal_foto', $pelanggan->tanggal_foto ? \Carbon\Carbon::parse($pelanggan->tanggal_foto)->format('Y-m-d\TH:i') : '') }}"
-                            class="form-control" required>
-                        </div>
-
                         <div class="form-group">
                             <label>Nama</label>
                             <input type="text" name="nama" value="{{ old('nama', $pelanggan->nama) }}" class="form-control" required>

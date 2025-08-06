@@ -28,6 +28,26 @@
             <div class="section-body">
                 <div class="card">
                     <div class="card-body">
+                        <div class="mb-3 d-flex justify-content-center gap-3">
+                            <form action="{{ route('plg.export') }}" method="GET" class="form-inline">
+                                <select name="bulan" class="form-control form-control-sm mr-2" required>
+                                    <option value="">Pilih Bulan</option>
+                                    @for ($i = 1; $i <= 12; $i++)
+                                        <option value="{{ $i }}">{{ DateTime::createFromFormat('!m', $i)->format('F') }}</option>
+                                    @endfor
+                                </select>
+
+                                <select name="tahun" class="form-control form-control-sm mr-2" required>
+                                    <option value="">Pilih Tahun</option>
+                                    @for ($year = now()->year; $year >= 2020; $year--)
+                                        <option value="{{ $year }}">{{ $year }}</option>
+                                    @endfor
+                                </select>
+
+                                <button class="btn btn-success btn-sm" type="submit">Export</button>
+                            </form>
+
+                        </div>
                         <div class="mb-3 d-flex justify-content-end gap-3">
                             <a href="{{ route('pelanggan.create') }}" class="btn btn-primary btn-sm mr-2">Tambah data</a>
 
@@ -35,15 +55,14 @@
                                 Import Data
                             </button>
 
-                            <form action="{{ route('plg.export') }}" method="GET">
-                                <button class="btn btn-success" type="submit">Export</button>
-                            </form>
+                            <button id="delete-selected" class="btn btn-danger btn-sm">Delete All</button>
                         </div>
 
                         <div class="table-responsive">
                             <table id="userTable" class="display">
                                 <thead>
                                     <tr>
+                                        <th><input type="checkbox" id="select-all"></th>
                                         <th>No</th>
                                         <th>Id Pel</th>
                                         <th>No Meter</th>
@@ -230,7 +249,17 @@
                 processing: true,
                 serverSide: true,
                 ajax: "{{ route('pelanggan.index') }}",
-                columns: [{
+                columns: [
+                    {
+                        data: 'id',
+                        name: 'checkbox',
+                        orderable: false,
+                        searchable: false,
+                        render: function (data, type, row) {
+                            return `<input type="checkbox" class="row-checkbox" value="${row.id}">`;
+                        }
+                    },
+                    {
                         data: 'DT_RowIndex',
                         name: 'DT_RowIndex',
                         orderable: false,
@@ -370,5 +399,68 @@
                 });
             });
         });
+    </script>
+
+    <script>
+        // Select/Deselect all checkboxes
+$('#select-all').on('click', function () {
+    $('.row-checkbox').prop('checked', this.checked);
+});
+
+// Multiple delete
+$('#delete-selected').on('click', function () {
+    const selectedIds = $('.row-checkbox:checked').map(function () {
+        return $(this).val();
+    }).get();
+
+    if (selectedIds.length === 0) {
+        Swal.fire({
+            title: "Tidak ada data terpilih",
+            text: "Pilih minimal satu baris untuk dihapus.",
+            icon: "warning"
+        });
+        return;
+    }
+
+    Swal.fire({
+        title: "Yakin ingin menghapus?",
+        text: "Data terpilih akan dihapus secara permanen.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Ya, Hapus!",
+        cancelButtonText: "Batal"
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.ajax({
+                url: "{{ route('pelanggan.multiple-delete') }}",
+                method: 'POST',
+                data: {
+                    ids: selectedIds,
+                    _token: '{{ csrf_token() }}'
+                },
+                success: function (response) {
+                    Swal.fire({
+                        title: "Berhasil!",
+                        text: response.message,
+                        icon: "success",
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                    $('#userTable').DataTable().ajax.reload(null, false);
+                },
+                error: function (xhr, status, error) {
+                    Swal.fire({
+                        title: "Gagal!",
+                        text: "Terjadi kesalahan saat menghapus data.",
+                        icon: "error"
+                    });
+                }
+            });
+        }
+    });
+});
+
     </script>
 @endpush

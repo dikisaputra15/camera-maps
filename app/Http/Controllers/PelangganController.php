@@ -134,8 +134,6 @@ class PelangganController extends Controller
 
         $pelanggan->id_pel = $request->id_pel;
         $pelanggan->no_meter = $request->no_meter;
-        $pelanggan->difoto_oleh = $request->difoto_oleh;
-        $pelanggan->tanggal_foto = $request->tanggal_foto;
         $pelanggan->nama = $request->nama;
         $pelanggan->tarif = $request->tarif;
         $pelanggan->daya = $request->daya;
@@ -391,13 +389,32 @@ class PelangganController extends Controller
         }
     }
 
-    public function exportExcel()
+    public function exportExcel(Request $request)
     {
-        // Nama file yang akan diunduh oleh pengguna
-        $fileName = 'data_pelanggan_' . date('Ymd_His') . '.xlsx';
+        $bulan = $request->bulan;
+        $tahun = $request->tahun;
 
-        // Unduh file Excel
-        return Excel::download(new PelangganExport, $fileName);
+        if (!$bulan || !$tahun) {
+            return redirect()->back()->with('error', 'Bulan dan tahun wajib diisi!');
+        }
+
+        return Excel::download(new PelangganExport($bulan, $tahun), "pelanggan_{$bulan}_{$tahun}.xlsx");
+    }
+
+    public function deleteMultiple(Request $request)
+    {
+        $ids = $request->input('ids');
+
+        if (empty($ids)) {
+            return response()->json(['message' => 'Tidak ada ID yang dipilih'], 400);
+        }
+
+        try {
+            DB::table('pelanggans')->whereIn('id', $ids)->delete();
+            return response()->json(['message' => 'Data berhasil dihapus']);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Gagal menghapus data'], 500);
+        }
     }
 
 }

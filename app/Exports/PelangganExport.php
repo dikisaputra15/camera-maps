@@ -14,22 +14,29 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet; // Tambahkan ini
 use Maatwebsite\Excel\Concerns\Exportable;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
-use Maatwebsite\Excel\Concerns\ShouldQueue;
 
-class PelangganExport implements FromCollection, WithHeadings, WithMapping, WithDrawings, ShouldAutoSize, WithStyles, WithChunkReading, ShouldQueue
+class PelangganExport implements FromCollection, WithHeadings, WithMapping, WithDrawings, ShouldAutoSize, WithStyles, WithChunkReading
 {
     use Exportable;
     protected $data;
+    protected $bulan;
+    protected $tahun;
     private $imageHeight = 80; // Tentukan tinggi gambar yang konsisten dalam piksel
 
-    public function __construct()
+    public function __construct($bulan = null, $tahun = null)
     {
+        $this->bulan = $bulan;
+        $this->tahun = $tahun;
+
         $this->data = Pelanggan::select(
             'id_pel', 'no_meter', 'difoto_oleh', 'tanggal_foto', 'kwh_latitude', 'kwh_longitude',
             'nama', 'tarif', 'daya', 'jenis_layanan', 'alamat', 'rt', 'rw', 'hasil_kunjungan',
             'telp', 'kabel_sl', 'jenis_sambungan', 'merk_mcb', 'ampere_mcb', 'gardu', 'verified',
             'gambar_kwh', 'gambar_rumah', 'gambar_sr', 'gambar_tiang'
-        )->get();
+        )
+        ->when($bulan, fn($query) => $query->whereMonth('tanggal_foto', $bulan))
+        ->when($tahun, fn($query) => $query->whereYear('tanggal_foto', $tahun))
+        ->get();
     }
 
     public function collection()
