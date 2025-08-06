@@ -103,7 +103,6 @@
                 <label for="tanggal_foto" class="form-label">Tanggal Foto : {{ $pelanggan->tanggal_foto }}</label>
             </div>
 
-@hasanyrole('admin|surveyor')
              <div class="col-md-12 mb-3">
                 <label for="hasil_kunjungan" class="form-label">Hasil Kunjungan</label>
                 <input type="text" class="form-control" id="hasil_kunjungan" name="hasil_kunjungan" value="{{ $pelanggan ? $pelanggan->hasil_kunjungan : '' }}">
@@ -317,71 +316,6 @@
                     ></div>
                 </div>
             </div>
- @endhasanyrole
-
-@role('cater')
-             {{-- CAMERA SECTION KWH --}}
-            <div class="camera-section">
-                <h3>Foto KWH</h3>
-                <div class="camera-feed-container">
-                    <video id="videoKWH" autoplay playsinline></video>
-                    <canvas id="overlayKWH" class="overlay"></canvas>
-                </div>
-                <div class="camera-controls">
-                    <button id="startKWH" class="btn-start">Mulai Kamera</button>
-                    <button id="captureKWH" class="btn-capture" disabled>Ambil Foto</button>
-                </div>
-                <div class="message" id="msgKWH">Status: Standby</div>
-                <div class="image-results">
-                    <img id="imageKWH"
-                         @if(!empty($pelanggan->gambar_kwh))
-                             src="{{ asset('storage/' . $pelanggan->gambar_kwh) }}"
-                             style="display: block;"
-                         @else
-                             style="display: none;"
-                         @endif
-                    >
-                    <div id="mapKWH" class="map-container"
-                         @if(!empty($pelanggan->kwh_latitude) && !empty($pelanggan->kwh_longitude))
-                             style="display: block;"
-                         @else
-                             style="display: none;"
-                         @endif >
-                    </div>
-                </div>
-            </div>
-
-            {{-- CAMERA SECTION RUMAH --}}
-            <div class="camera-section">
-                <h3>Foto Rumah</h3>
-                <div class="camera-feed-container">
-                    <video id="videoRumah" autoplay playsinline></video>
-                    <canvas id="overlayRumah" class="overlay"></canvas>
-                </div>
-                <div class="camera-controls">
-                    <button id="startRumah" class="btn-start">Mulai Kamera</button>
-                    <button id="captureRumah" class="btn-capture" disabled>Ambil Foto</button>
-                </div>
-                <div class="message" id="msgRumah">Status: Standby</div>
-                <div class="image-results">
-                    <img id="imageRumah"
-                         @if(!empty($pelanggan->gambar_rumah))
-                             src="{{ asset('storage/' . $pelanggan->gambar_rumah) }}"
-                             style="display: block;"
-                         @else
-                             style="display: none;"
-                         @endif
-                    >
-                    <div id="mapRumah" class="map-container"
-                         @if(!empty($pelanggan->rumah_latitude) && !empty($pelanggan->rumah_longitude))
-                             style="display: block;"
-                         @else
-                             style="display: none;"
-                         @endif
-                    ></div>
-                </div>
-            </div>
-@endrole
 
             <div class="text-center mt-4">
                 <button id="submitAllImages" class="btn btn-submit" disabled>Simpan Semua Gambar</button>
@@ -676,7 +610,7 @@
         const tiangReady = (capturedImageTiang !== null && capturedImageTiang !== "null");
 
         // Enable submit button only if all four images are either newly captured or already exist in DB
-        if (pelangganId && kwhReady && rumahReady && srReady && tiangReady) {
+        if (pelangganId || kwhReady || rumahReady || srReady || tiangReady) {
             submitAllImagesBtn.disabled = false;
         } else {
             submitAllImagesBtn.disabled = true;

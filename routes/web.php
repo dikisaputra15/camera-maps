@@ -24,4 +24,5 @@ Route::put('/pelanggan/{id}/update-verified', [PelangganController::class, 'upda
 Route::post('/pelangganimport', [PelangganController::class, 'import'])->name('plg.import')->middleware(['auth']);
 Route::get('/pelangganexport', [PelangganController::class, 'exportExcel'])->name('plg.export')->middleware(['auth']);
 Route::post('/pelanggan/delete-multiple', [PelangganController::class, 'deleteMultiple'])->name('pelanggan.multiple-delete')->middleware(['auth']);
+Route::put('/pelanggancaters/{id}/update-gambar', [PelangganController::class, 'updateimagecater'])->name('pelanggancaters.update_images')->middleware(['auth']);
 

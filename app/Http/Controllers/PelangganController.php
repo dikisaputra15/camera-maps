@@ -214,138 +214,115 @@ class PelangganController extends Controller
     {
         $pelanggan = Pelanggan::find($id);
 
-        return view('pelanggan.formupload', compact('pelanggan'));
-    }
+        $user = Auth::user();
 
-   public function updateImages(Request $request, $id)
-   {
-        $pelanggan = Pelanggan::find($id);
-
-        if (!$pelanggan) {
-            return response()->json(['message' => 'Pelanggan tidak ditemukan'], 404);
+        if ($user->hasAnyRole(['admin', 'surveyor'])) {
+            return view('pelanggan.formupload', compact('pelanggan'));
+        } elseif ($user->hasRole('cater')) {
+            return view('pelanggan.formupload_cater', compact('pelanggan'));
+        } else {
+            abort(403, 'Unauthorized access.');
         }
 
-        // Define a reusable function to handle saving base64 images
-        $storeBase64Image = function (string $base64Image, string $folder, string $prefix, $existingPath = null) {
-            // Check if the image data is valid and not a placeholder
-            if ($base64Image && $base64Image !== 'EXISTS_AND_UNCHANGED' && $base64Image !== 'null') {
-                // Decode base64 string
-                $base64 = preg_replace('/^data:image\/[a-zA-Z]+;base64,/', '', $base64Image);
-                $base64 = str_replace(' ', '+', $base64);
+    }
 
-                // Determine image type (png, jpeg, etc.) - assuming png for simplicity or extract from data URI
-                $type = 'png';
-                if (preg_match('/^data:image\/(\w+);base64,/', $base64Image, $matches)) {
-                    $type = strtolower($matches[1]);
-                }
+  public function updateImages(Request $request, $id)
+{
+    $pelanggan = Pelanggan::find($id);
 
-                $filename = $prefix . '_' . Str::uuid() . '.' . $type;
-                $path = "pelanggan/{$folder}/{$filename}"; // Define full path in storage
+    if (!$pelanggan) {
+        return response()->json(['message' => 'Pelanggan tidak ditemukan'], 404);
+    }
 
-                // Store the image
-                Storage::disk('public')->put($path, base64_decode($base64));
+    try {
+        $validated = $request->validate([
+            'gambar_kwh'        => 'nullable|string',
+            'kwh_latitude'      => 'nullable|numeric',
+            'kwh_longitude'     => 'nullable|numeric',
+            'gambar_rumah'      => 'nullable|string',
+            'gambar_sr'         => 'nullable|string',
+            'gambar_tiang'      => 'nullable|string',
+            'hasil_kunjungan'   => 'nullable|string',
+            'telp'              => 'nullable|string',
+            'kabel_sl'          => 'nullable|string',
+            'jenis_sambungan'   => 'nullable|string',
+            'merk_mcb'          => 'nullable|string',
+            'ampere_mcb'        => 'nullable|string',
+            'gardu'             => 'nullable|string',
+        ]);
 
-                // Delete old image if it exists and is different from the new one
-                if ($existingPath && Storage::disk('public')->exists($existingPath) && $existingPath !== $path) {
-                    Storage::disk('public')->delete($existingPath);
-                }
+        // Closure untuk menangani upload base64
+        $handleBase64Image = function ($image, $folder, $prefix, $existingPath) {
+            if (!$image || $image === 'EXISTS_AND_UNCHANGED') {
+                return $existingPath;
+            }
 
-                return $path; // Return the path relative to the public disk
-            } elseif ($base64Image === 'null') {
-                // If 'null' is explicitly sent, delete existing image and set to null
+            if ($image === 'null') {
                 if ($existingPath && Storage::disk('public')->exists($existingPath)) {
                     Storage::disk('public')->delete($existingPath);
                 }
                 return null;
             }
-            // If 'EXISTS_AND_UNCHANGED' or no new image, return existing path
-            return $existingPath;
+
+            $base64 = preg_replace('/^data:image\/\w+;base64,/', '', $image);
+            $base64 = str_replace(' ', '+', $base64);
+
+            if (empty($base64)) return $existingPath;
+
+            $type = 'png';
+            if (preg_match('/^data:image\/(\w+);base64,/', $image, $matches)) {
+                $type = strtolower($matches[1]);
+            }
+
+            $filename = "{$prefix}_" . Str::uuid() . ".{$type}";
+            $path = "pelanggan/{$folder}/{$filename}";
+
+            Storage::disk('public')->put($path, base64_decode($base64));
+
+            if ($existingPath && Storage::disk('public')->exists($existingPath) && $existingPath !== $path) {
+                Storage::disk('public')->delete($existingPath);
+            }
+
+            return $path;
         };
 
-        try {
-            // Validate all incoming data, including new fields and coordinates
-            $validatedData = $request->validate([
-                'gambar_kwh'        => 'nullable|string',
-                'kwh_latitude'      => 'nullable|numeric', // Only KWH latitude/longitude validated
-                'kwh_longitude'     => 'nullable|numeric', // Only KWH latitude/longitude validated
-                'gambar_rumah'      => 'nullable|string',
-                // Removed validation for rumah_latitude, rumah_longitude
-                'gambar_sr'         => 'nullable|string',
-                // Removed validation for sr_latitude, sr_longitude
-                'gambar_tiang'      => 'nullable|string',
-                // Removed validation for tiang_latitude, tiang_longitude
-                'hasil_kunjungan'   => 'nullable|string',
-                'telp'              => 'nullable|string',
-                'kabel_sl'          => 'nullable|string',
-                'jenis_sambungan'   => 'nullable|string',
-                'merk_mcb'          => 'nullable|string',
-                'ampere_mcb'        => 'nullable|string',
-                'gardu'             => 'nullable|string',
-            ]);
+        // Update gambar
+        $pelanggan->gambar_kwh    = $handleBase64Image($validated['gambar_kwh'] ?? null, 'kwh', 'kwh', $pelanggan->gambar_kwh);
+        $pelanggan->gambar_rumah  = $handleBase64Image($validated['gambar_rumah'] ?? null, 'rumah', 'rumah', $pelanggan->gambar_rumah);
+        $pelanggan->gambar_sr     = $handleBase64Image($validated['gambar_sr'] ?? null, 'sr', 'sr', $pelanggan->gambar_sr);
+        $pelanggan->gambar_tiang  = $handleBase64Image($validated['gambar_tiang'] ?? null, 'tiang', 'tiang', $pelanggan->gambar_tiang);
 
-            // --- Update Gambar KWH ---
-            $pelanggan->gambar_kwh = $storeBase64Image(
-                $validatedData['gambar_kwh'] ?? null,
-                'kwh',
-                'kwh',
-                $pelanggan->gambar_kwh
-            );
-            $pelanggan->kwh_latitude = $validatedData['kwh_latitude'] ?? null;
-            $pelanggan->kwh_longitude = $validatedData['kwh_longitude'] ?? null;
+        // Update koordinat KWH
+        $pelanggan->kwh_latitude  = $validated['kwh_latitude'] ?? null;
+        $pelanggan->kwh_longitude = $validated['kwh_longitude'] ?? null;
 
-            // --- Update Gambar Rumah ---
-            $pelanggan->gambar_rumah = $storeBase64Image(
-                $validatedData['gambar_rumah'] ?? null,
-                'rumah',
-                'rumah',
-                $pelanggan->gambar_rumah
-            );
-            // Removed assignment for rumah_latitude, rumah_longitude
+        // Update data lainnya
+        $pelanggan->hasil_kunjungan  = $validated['hasil_kunjungan'] ?? $pelanggan->hasil_kunjungan;
+        $pelanggan->telp             = $validated['telp'] ?? $pelanggan->telp;
+        $pelanggan->kabel_sl         = $validated['kabel_sl'] ?? $pelanggan->kabel_sl;
+        $pelanggan->jenis_sambungan = $validated['jenis_sambungan'] ?? $pelanggan->jenis_sambungan;
+        $pelanggan->merk_mcb         = $validated['merk_mcb'] ?? $pelanggan->merk_mcb;
+        $pelanggan->ampere_mcb       = $validated['ampere_mcb'] ?? $pelanggan->ampere_mcb;
+        $pelanggan->gardu            = $validated['gardu'] ?? $pelanggan->gardu;
 
-            // --- Update Gambar SR ---
-            $pelanggan->gambar_sr = $storeBase64Image(
-                $validatedData['gambar_sr'] ?? null,
-                'sr',
-                'sr',
-                $pelanggan->gambar_sr
-            );
-            // Removed assignment for sr_latitude, sr_longitude
+        // Info sistem
+        $pelanggan->difoto_oleh   = auth()->check() ? auth()->user()->name : 'Guest';
+        $pelanggan->tanggal_foto  = now('Asia/Jakarta');
+        $pelanggan->verified      = false;
 
-            // --- Update Gambar Tiang ---
-            $pelanggan->gambar_tiang = $storeBase64Image(
-                $validatedData['gambar_tiang'] ?? null,
-                'tiang',
-                'tiang',
-                $pelanggan->gambar_tiang
-            );
-            // Removed assignment for tiang_latitude, tiang_longitude
+        $pelanggan->save();
 
-            // --- Update other form fields ---
-            $pelanggan->hasil_kunjungan = $validatedData['hasil_kunjungan'] ?? $pelanggan->hasil_kunjungan;
-            $pelanggan->telp = $validatedData['telp'] ?? $pelanggan->telp;
-            $pelanggan->kabel_sl = $validatedData['kabel_sl'] ?? $pelanggan->kabel_sl;
-            $pelanggan->jenis_sambungan = $validatedData['jenis_sambungan'] ?? $pelanggan->jenis_sambungan;
-            $pelanggan->merk_mcb = $validatedData['merk_mcb'] ?? $pelanggan->merk_mcb;
-            $pelanggan->ampere_mcb = $validatedData['ampere_mcb'] ?? $pelanggan->ampere_mcb;
-            $pelanggan->gardu = $validatedData['gardu'] ?? $pelanggan->gardu;
+        return response()->json(['message' => 'Gambar dan data pelanggan berhasil diperbarui!'], 200);
 
-            // --- Auto-filled/system fields ---
-            $pelanggan->difoto_oleh = auth()->check() ? auth()->user()->name : 'Guest';
-            $pelanggan->tanggal_foto = now('Asia/Jakarta');
-            $pelanggan->verified = false; // Assuming it resets to false on any update
-
-            $pelanggan->save();
-
-            return response()->json(['message' => 'Gambar dan data pelanggan berhasil diperbarui!'], 200);
-
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            Log::error("Validation Error for pelanggan {$id}: " . json_encode($e->errors()));
-            return response()->json(['message' => 'Data tidak valid.', 'errors' => $e->errors()], 422);
-        } catch (\Throwable $e) {
-            Log::error("Gagal update gambar atau data pelanggan {$id}: {$e->getMessage()} in {$e->getFile()}:{$e->getLine()}");
-            return response()->json(['message' => 'Gagal mengupdate gambar dan data.'], 500);
-        }
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        Log::error("Validasi gagal untuk pelanggan {$id}: " . json_encode($e->errors()));
+        return response()->json(['message' => 'Data tidak valid.', 'errors' => $e->errors()], 422);
+    } catch (\Throwable $e) {
+        Log::error("Gagal update pelanggan {$id}: {$e->getMessage()} in {$e->getFile()}:{$e->getLine()}");
+        return response()->json(['message' => 'Gagal mengupdate gambar dan data.'], 500);
     }
+}
+
 
   public function updateVerified(Request $request, $id)
 {
@@ -414,6 +391,95 @@ class PelangganController extends Controller
             return response()->json(['message' => 'Data berhasil dihapus']);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Gagal menghapus data'], 500);
+        }
+    }
+
+   public function updateimagecater(Request $request, $id)
+    {
+        $pelanggan = Pelanggan::find($id);
+
+        if (!$pelanggan) {
+            return response()->json(['message' => 'Pelanggan tidak ditemukan'], 404);
+        }
+
+        try {
+            $validated = $request->validate([
+                'gambar_kwh'        => 'nullable|string',
+                'kwh_latitude'      => 'nullable|numeric',
+                'kwh_longitude'     => 'nullable|numeric',
+                'gambar_rumah'      => 'nullable|string',
+            ]);
+
+            // Utility closure to process base64 image
+            $handleBase64Image = function ($image, $folder, $prefix, $oldPath) {
+                if ($image === 'EXISTS_AND_UNCHANGED') {
+                    return $oldPath;
+                }
+
+                if ($image === 'null') {
+                    if ($oldPath && Storage::disk('public')->exists($oldPath)) {
+                        Storage::disk('public')->delete($oldPath);
+                    }
+                    return null;
+                }
+
+                if ($image) {
+                    $base64 = preg_replace('/^data:image\/\w+;base64,/', '', $image);
+                    $base64 = str_replace(' ', '+', $base64);
+
+                    $type = 'png';
+                    if (preg_match('/^data:image\/(\w+);base64,/', $image, $matches)) {
+                        $type = strtolower($matches[1]);
+                    }
+
+                    $filename = $prefix . '_' . Str::uuid() . '.' . $type;
+                    $path = "pelanggan/{$folder}/{$filename}";
+
+                    Storage::disk('public')->put($path, base64_decode($base64));
+
+                    if ($oldPath && Storage::disk('public')->exists($oldPath) && $oldPath !== $path) {
+                        Storage::disk('public')->delete($oldPath);
+                    }
+
+                    return $path;
+                }
+
+                return $oldPath;
+            };
+
+            // Update gambar KWH
+            $pelanggan->gambar_kwh = $handleBase64Image(
+                $validated['gambar_kwh'] ?? 'EXISTS_AND_UNCHANGED',
+                'kwh',
+                'kwh',
+                $pelanggan->gambar_kwh
+            );
+
+            $pelanggan->kwh_latitude = $validated['kwh_latitude'] ?? null;
+            $pelanggan->kwh_longitude = $validated['kwh_longitude'] ?? null;
+
+            // Update gambar Rumah
+            $pelanggan->gambar_rumah = $handleBase64Image(
+                $validated['gambar_rumah'] ?? 'EXISTS_AND_UNCHANGED',
+                'rumah',
+                'rumah',
+                $pelanggan->gambar_rumah
+            );
+
+            $pelanggan->difoto_oleh = auth()->check() ? auth()->user()->name : 'Guest';
+            $pelanggan->tanggal_foto = now('Asia/Jakarta');
+            $pelanggan->verified = false;
+
+            $pelanggan->save();
+
+            return response()->json(['message' => 'Gambar dan data berhasil diperbarui.'], 200);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::error("Validasi gagal: " . json_encode($e->errors()));
+            return response()->json(['message' => 'Validasi gagal.', 'errors' => $e->errors()], 422);
+        } catch (\Throwable $e) {
+            Log::error("Gagal update pelanggan {$id}: {$e->getMessage()} in {$e->getFile()}:{$e->getLine()}");
+            return response()->json(['message' => 'Terjadi kesalahan saat update data.'], 500);
         }
     }
 
