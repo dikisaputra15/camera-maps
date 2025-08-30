@@ -10,6 +10,13 @@
 
 @section('main')
     <div class="card card-primary">
+
+        @if ($errors->has('session_expired'))
+            <div class="alert alert-warning">
+                {{ $errors->first('session_expired') }}
+            </div>
+        @endif
+
         <div class="card-header">
             <h4>Login</h4>
         </div>
